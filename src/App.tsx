@@ -214,8 +214,8 @@ function Board(props: BoardProps) {
   const [isDrawing, setIsDrawing] = React.useState<boolean>();
   const [offset, setOffset] = React.useState<any>({x: 0, y: 0});
 
-  const canvasWidth = 500;
-  const canvasHeight = 500;
+  const canvasWidth = 800;
+  const canvasHeight = 800;
   const fetchShapes = async function() {
     const mongodb = props.user.mongoClient('mongodb-atlas');
     const components = await mongodb
