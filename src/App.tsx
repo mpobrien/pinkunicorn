@@ -136,7 +136,13 @@ function redraw(
 
     if (component.shape == 'circle') {
       context.beginPath();
-      context.arc(component.x, component.y, component.x2, 0, 2 * Math.PI);
+      context.arc(
+        component.x,
+        component.y,
+        Math.abs(component.x2 - component.x) / 2,
+        0,
+        2 * Math.PI,
+      );
       context.stroke();
     } else if (component.shape == 'rectangle') {
       context.beginPath();
@@ -152,7 +158,7 @@ interface Point {
 }
 
 function Board(props: BoardProps) {
-  const [tool, setTool] = React.useState<string>();
+  const [tool, setTool] = React.useState<string>('circle');
   const [shapes, setShapes] = React.useState<any>();
   const [newShape, setNewShape] = React.useState<any>();
   const [fetched, setFetched] = React.useState<boolean>();
@@ -235,7 +241,6 @@ function Board(props: BoardProps) {
     ) {
       return;
     }
-    console.log(canvasRef.current.getBoundingClientRect());
     let newShape = {
       _id: new BSON.ObjectId(),
       x: new BSON.Double(startPoint.x),
