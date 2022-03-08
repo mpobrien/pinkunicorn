@@ -274,6 +274,7 @@ function Board(props: BoardProps) {
           startPoint.y,
       ),
       strokeColor: hex2Rgb(color),
+      strokeWidth: 1,
     } as any;
     if (tool == 'circle') {
       newShape.shape = 'circle';
