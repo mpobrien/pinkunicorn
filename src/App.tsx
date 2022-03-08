@@ -126,8 +126,12 @@ function redraw(
   components: any[],
   canvasWidth: number,
   canvasHeight: number,
+  offset: {x: number; y: number} | null,
   clear: boolean,
 ) {
+  if (!offset) {
+    offset = {x: 0, y: 0};
+  }
   if (clear) {
     context.clearRect(0, 0, canvasWidth, canvasHeight);
   }
@@ -146,10 +150,16 @@ function redraw(
     if (component.shape == 'path') {
       context.beginPath();
       if (component.points.length > 0) {
-        context.moveTo(component.points[0].x, component.points[0].y);
+        context.moveTo(
+          component.points[0].x + offset.x,
+          component.points[0].y + offset.y,
+        );
       }
       for (var j = 0; j < component.points.length; j++) {
-        context.lineTo(component.points[j].x, component.points[j].y);
+        context.lineTo(
+          component.points[j].x + offset.x,
+          component.points[j].y + offset.y,
+        );
       }
       context.stroke();
     }
@@ -164,8 +174,8 @@ function redraw(
       const radiusX = Math.abs(component.right - component.left) / 2;
       const radiusY = Math.abs(component.bottom - component.top) / 2;
       context.ellipse(
-        (component.right - component.left) / 2 + component.left,
-        (component.bottom - component.top) / 2 + component.top,
+        (component.right - component.left) / 2 + component.left + offset.x,
+        (component.bottom - component.top) / 2 + component.top + offset.y,
         radiusX,
         radiusY,
         0,
@@ -176,8 +186,8 @@ function redraw(
     } else if (component.shape == 'rectangle') {
       context.beginPath();
       context.strokeRect(
-        component.left,
-        component.top,
+        component.left + offset.x,
+        component.top + offset.y,
         component.right - component.left,
         component.bottom - component.top,
       );
@@ -202,6 +212,7 @@ function Board(props: BoardProps) {
   const contextRef = React.useRef<CanvasRenderingContext2D>();
   const [startPoint, setStartPoint] = React.useState<Point | null>();
   const [isDrawing, setIsDrawing] = React.useState<boolean>();
+  const [offset, setOffset] = React.useState<any>({x: 0, y: 0});
 
   const canvasWidth = 500;
   const canvasHeight = 500;
@@ -221,7 +232,7 @@ function Board(props: BoardProps) {
       return;
     }
     setShapes(components);
-    redraw(context, components, canvasWidth, canvasHeight, true);
+    redraw(context, components, canvasWidth, canvasHeight, null, true);
   };
 
   useEffect(() => {
@@ -247,15 +258,37 @@ function Board(props: BoardProps) {
       return;
     }
     setIsDrawing(true);
-    redraw(contextRef.current, shapes, canvasWidth, canvasHeight, true);
+    console.log('drawing and offset is', offset);
+    redraw(contextRef.current, shapes, canvasWidth, canvasHeight, offset, true);
     setStartPoint({
       x: event.clientX - canvasRef.current.getBoundingClientRect().x,
       y: event.clientY - canvasRef.current.getBoundingClientRect().y,
     });
   };
 
-  const finishDrawing = async function() {
-    if (!newShape || !isDrawing) {
+  const finishDrawing = async (
+    event: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
+  ) => {
+    if (!contextRef.current || !canvasRef.current || !startPoint) {
+      return;
+    }
+    if (tool == 'move') {
+      const endPoint = {
+        x: event.clientX - canvasRef.current.getBoundingClientRect().x,
+        y: event.clientY - canvasRef.current.getBoundingClientRect().y,
+      };
+      setOffset({
+        x: offset.x + (endPoint.x - startPoint.x),
+        y: offset.y + (endPoint.y - startPoint.y),
+      });
+    }
+    if (!newShape) {
+      setIsDrawing(false);
+      return;
+    }
+
+    if (!isDrawing) {
+      setIsDrawing(false);
       return;
     }
     setIsDrawing(false);
@@ -270,12 +303,17 @@ function Board(props: BoardProps) {
       newShape.bottom,
     ];
 
-    newShape.left = new BSON.Double(Math.min(left, right));
-    newShape.right = new BSON.Double(Math.max(left, right));
+    console.log('new shape inserting is', left, right, offset.x);
+    newShape.left = new BSON.Double(Math.min(left, right) - offset.x);
+    newShape.right = new BSON.Double(Math.max(left, right) - offset.x);
+    console.log('updated', newShape.left, newShape.right);
 
-    newShape.top = new BSON.Double(Math.min(top, bottom));
-    newShape.bottom = new BSON.Double(Math.max(top, bottom));
+    newShape.top = new BSON.Double(Math.min(top, bottom) - offset.y);
+    newShape.bottom = new BSON.Double(Math.max(top, bottom) - offset.y);
     if (newShape.shape == 'path') {
+      newShape.points = newShape.points.map((point: {x: number; y: number}) => {
+        return {x: point.x - offset.x, y: point.y - offset.y};
+      });
       newShape.left = new BSON.Double(
         Math.min(...newShape.points.map((p: any) => p.x)),
       );
@@ -310,7 +348,13 @@ function Board(props: BoardProps) {
       y: event.clientY - canvasRef.current.getBoundingClientRect().y,
     };
     let newShape: any;
-    if (tool == 'path') {
+    let newOffset = offset;
+    let offsetDelta = {x: 0, y: 0};
+    if (tool == 'move') {
+      const xDiff = endPoint.x - startPoint.x;
+      const yDiff = endPoint.y - startPoint.y;
+      offsetDelta = {x: xDiff, y: yDiff};
+    } else if (tool == 'path') {
       let newPoints = (points || []).concat([
         {x: new BSON.Double(endPoint.x), y: new BSON.Double(endPoint.y)},
       ]);
@@ -356,9 +400,25 @@ function Board(props: BoardProps) {
         shape: tool,
       };
     }
-    setNewShape(newShape);
-    redraw(contextRef.current, shapes, canvasWidth, canvasHeight, true);
-    redraw(contextRef.current, [newShape], canvasWidth, canvasHeight, false);
+    redraw(
+      contextRef.current,
+      shapes,
+      canvasWidth,
+      canvasHeight,
+      {x: offset.x + offsetDelta.x, y: offset.y + offsetDelta.y},
+      true,
+    );
+    if (newShape) {
+      setNewShape(newShape);
+      redraw(
+        contextRef.current,
+        [newShape],
+        canvasWidth,
+        canvasHeight,
+        null,
+        false,
+      );
+    }
   };
 
   return (
@@ -371,6 +431,7 @@ function Board(props: BoardProps) {
         <option value="rectangle">&#9634;</option>
         <option value="path">&#9998;</option>
         <option value="line">&#9144;</option>
+        <option value="move">move</option>
       </select>
       <div>
         <CompactPicker color={color} onChangeComplete={c => setColor(c.hex)} />
