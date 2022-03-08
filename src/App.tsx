@@ -111,6 +111,16 @@ const rgbToHex = function(rgb: number) {
   return hex;
 };
 
+const hex2Rgb = (hex: string | undefined) => {
+  if (!hex) {
+    return 0;
+  }
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return r * 65536 + g * 256 + b;
+};
+
 function redraw(
   context: CanvasRenderingContext2D,
   components: any[],
@@ -127,26 +137,33 @@ function redraw(
 
   for (var i = 0; i < components.length; i++) {
     const component = components[i];
-    if (component.color) {
-      const hexColor = rgbToHex(component.color);
+    if (component.strokeColor) {
+      const hexColor = rgbToHex(component.strokeColor);
       context.strokeStyle = '#' + hexColor;
     } else {
       context.strokeStyle = '#000000';
     }
+    //if(component.fillColor){
+    //}
 
     if (component.shape == 'circle') {
-      context.beginPath();
-      context.arc(
-        component.x,
-        component.y,
-        Math.abs(component.x2 - component.x) / 2,
-        0,
-        2 * Math.PI,
+      const distance = Math.sqrt(
+        Math.pow(
+          component.width - component.x + (component.height - component.y),
+          2,
+        ),
       );
+      context.beginPath();
+      context.arc(component.x, component.y, distance, 0, 2 * Math.PI);
       context.stroke();
     } else if (component.shape == 'rectangle') {
       context.beginPath();
-      context.strokeRect(component.x, component.y, component.x2, component.y2);
+      context.strokeRect(
+        component.x,
+        component.y,
+        component.width,
+        component.height,
+      );
       context.stroke();
     }
   }
@@ -220,7 +237,7 @@ function Board(props: BoardProps) {
   };
 
   const finishDrawing = async function() {
-    if (!newShape) {
+    if (!newShape || !isDrawing) {
       return;
     }
     setIsDrawing(false);
@@ -245,16 +262,18 @@ function Board(props: BoardProps) {
       _id: new BSON.ObjectId(),
       x: new BSON.Double(startPoint.x),
       y: new BSON.Double(startPoint.y),
-      x2: new BSON.Double(
+      z: new BSON.Double(0),
+      width: new BSON.Double(
         event.clientX -
           canvasRef.current.getBoundingClientRect().x -
           startPoint.x,
       ),
-      y2: new BSON.Double(
+      height: new BSON.Double(
         event.clientY -
           canvasRef.current.getBoundingClientRect().y -
           startPoint.y,
       ),
+      strokeColor: hex2Rgb(color),
     } as any;
     if (tool == 'circle') {
       newShape.shape = 'circle';
