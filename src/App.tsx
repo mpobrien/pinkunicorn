@@ -4,6 +4,8 @@ import Login from './Login';
 import classnames from 'classnames';
 import * as Realm from 'realm-web';
 import copy from './copy.png';
+import {CompactPicker} from 'react-color';
+import BSON from 'bson';
 
 const LOCAL_STORAGE_KEY = 'stitchutils_app';
 
@@ -109,9 +111,56 @@ const rgbToHex = function(rgb: number) {
   return hex;
 };
 
+function redraw(
+  context: CanvasRenderingContext2D,
+  components: any[],
+  canvasWidth: number,
+  canvasHeight: number,
+  clear: boolean,
+) {
+  if (clear) {
+    context.clearRect(0, 0, canvasWidth, canvasHeight);
+  }
+  context.strokeStyle = '#000000';
+  context.strokeRect(0, 0, canvasWidth, canvasHeight);
+  context.stroke();
+
+  for (var i = 0; i < components.length; i++) {
+    const component = components[i];
+    if (component.color) {
+      const hexColor = rgbToHex(component.color);
+      context.strokeStyle = '#' + hexColor;
+    } else {
+      context.strokeStyle = '#000000';
+    }
+
+    if (component.shape == 'circle') {
+      context.beginPath();
+      context.arc(component.x, component.y, component.x2, 0, 2 * Math.PI);
+      context.stroke();
+    } else if (component.shape == 'rectangle') {
+      context.beginPath();
+      context.strokeRect(component.x, component.y, component.x2, component.y2);
+      context.stroke();
+    }
+  }
+}
+
+interface Point {
+  x: number;
+  y: number;
+}
+
 function Board(props: BoardProps) {
+  const [tool, setTool] = React.useState<string>();
   const [shapes, setShapes] = React.useState<any>();
-  const canvasRef = React.useRef(null);
+  const [newShape, setNewShape] = React.useState<any>();
+  const [fetched, setFetched] = React.useState<boolean>();
+  const [color, setColor] = React.useState<string>();
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+  const contextRef = React.useRef<CanvasRenderingContext2D>();
+  const [startPoint, setStartPoint] = React.useState<Point | null>();
+  const [isDrawing, setIsDrawing] = React.useState<boolean>();
 
   const canvasWidth = 500;
   const canvasHeight = 500;
@@ -130,42 +179,110 @@ function Board(props: BoardProps) {
     if (!context) {
       return;
     }
-    context.clearRect(0, 0, canvasWidth, canvasHeight);
+    setShapes(components);
+    redraw(context, components, canvasWidth, canvasHeight, true);
+  };
 
-    for (var i = 0; i < components.length; i++) {
-      const component = components[i];
-      if (component.color) {
-        const hexColor = rgbToHex(component.color);
-        context.strokeStyle = '#' + hexColor;
-      } else {
-        context.strokeStyle = '#000000';
-      }
-
-      if (component.shape == 'circle') {
-        context.beginPath();
-        context.arc(component.x, component.y, component.x2, 0, 2 * Math.PI);
-        context.stroke();
-      } else if (component.shape == 'rectangle') {
-        context.beginPath();
-        context.strokeRect(
-          component.x,
-          component.y,
-          component.x2,
-          component.y2,
-        );
-        context.stroke();
-      }
+  useEffect(() => {
+    if (!fetched) {
+      fetchShapes();
+      setFetched(true);
     }
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      return;
+    }
+    const canvasHTML = canvas as HTMLCanvasElement;
+    const context = canvasHTML.getContext('2d');
+    if (context) {
+      contextRef.current = context;
+    }
+  }, []);
+
+  const startDrawing = (
+    event: React.MouseEvent<HTMLCanvasElement, MouseEvent>,
+  ) => {
+    if (!contextRef.current || !canvasRef.current) {
+      return;
+    }
+    setIsDrawing(true);
+    redraw(contextRef.current, shapes, canvasWidth, canvasHeight, true);
+    setStartPoint({
+      x: event.clientX - canvasRef.current.getBoundingClientRect().x,
+      y: event.clientY - canvasRef.current.getBoundingClientRect().y,
+    });
+  };
+
+  const finishDrawing = async function() {
+    if (!newShape) {
+      return;
+    }
+    setIsDrawing(false);
+    setStartPoint(null);
+    const mongodb = props.user.mongoClient('mongodb-atlas');
+
+    const components = await mongodb
+      .db('pinkunicorn')
+      .collection<Component>('Component')
+      .insertOne(newShape);
+  };
+  const draw = (event: React.MouseEvent<HTMLCanvasElement, MouseEvent>) => {
+    if (
+      !isDrawing ||
+      !contextRef.current ||
+      !canvasRef.current ||
+      !startPoint
+    ) {
+      return;
+    }
+    console.log(canvasRef.current.getBoundingClientRect());
+    let newShape = {
+      _id: new BSON.ObjectId(),
+      x: new BSON.Double(startPoint.x),
+      y: new BSON.Double(startPoint.y),
+      x2: new BSON.Double(
+        event.clientX -
+          canvasRef.current.getBoundingClientRect().x -
+          startPoint.x,
+      ),
+      y2: new BSON.Double(
+        event.clientY -
+          canvasRef.current.getBoundingClientRect().y -
+          startPoint.y,
+      ),
+    } as any;
+    if (tool == 'circle') {
+      newShape.shape = 'circle';
+    } else if (tool == 'rectangle') {
+      newShape.shape = 'rectangle';
+    }
+    setNewShape(newShape);
+    redraw(contextRef.current, shapes, canvasWidth, canvasHeight, true);
+    redraw(contextRef.current, [newShape], canvasWidth, canvasHeight, false);
   };
 
   return (
     <div>
-      <button onClick={fetchShapes}>Fetch</button>
+      <button onClick={fetchShapes}>Refresh Board</button>
+      <br />
+      <br />
+      <select value={tool} onChange={e => setTool(e.target.value)}>
+        <option value="circle">&#9711;</option>
+        <option value="rectangle">&#9634;</option>
+        <option value="pencil">&#9998;</option>
+        <option value="line">&#9144;</option>
+      </select>
+      <div>
+        <CompactPicker color={color} onChangeComplete={c => setColor(c.hex)} />
+      </div>
       <div>
         <canvas
           width={canvasWidth}
           height={canvasHeight}
-          ref={canvasRef}></canvas>
+          ref={canvasRef}
+          onMouseDown={startDrawing}
+          onMouseUp={finishDrawing}
+          onMouseMove={draw}></canvas>
       </div>
     </div>
   );
