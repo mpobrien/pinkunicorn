@@ -146,23 +146,39 @@ function redraw(
     //if(component.fillColor){
     //}
 
+    if (component.shape == 'line') {
+      context.beginPath();
+      context.moveTo(component.left, component.top);
+      context.lineTo(component.right, component.bottom);
+      context.stroke();
+    }
     if (component.shape == 'circle') {
       const distance = Math.sqrt(
         Math.pow(
-          component.width - component.x + (component.height - component.y),
+          component.right - component.x + (component.height - component.y),
           2,
         ),
       );
       context.beginPath();
-      context.arc(component.x, component.y, distance, 0, 2 * Math.PI);
+      const radiusX = Math.abs(component.right - component.left) / 2;
+      const radiusY = Math.abs(component.bottom - component.top) / 2;
+      context.ellipse(
+        (component.right - component.left) / 2 + component.left,
+        (component.bottom - component.top) / 2 + component.top,
+        radiusX,
+        radiusY,
+        0,
+        0,
+        2 * Math.PI,
+      );
       context.stroke();
     } else if (component.shape == 'rectangle') {
       context.beginPath();
       context.strokeRect(
-        component.x,
-        component.y,
-        component.width,
-        component.height,
+        component.left,
+        component.top,
+        component.right - component.left,
+        component.bottom - component.top,
       );
       context.stroke();
     }
@@ -244,6 +260,20 @@ function Board(props: BoardProps) {
     setStartPoint(null);
     const mongodb = props.user.mongoClient('mongodb-atlas');
 
+    let [left, right, top, bottom] = [
+      newShape.left,
+      newShape.right,
+      newShape.top,
+      newShape.bottom,
+    ];
+
+    newShape.left = new BSON.Double(Math.min(left, right));
+    newShape.right = new BSON.Double(Math.max(left, right));
+
+    newShape.top = new BSON.Double(Math.min(top, bottom));
+    newShape.bottom = new BSON.Double(Math.max(top, bottom));
+    console.log(newShape);
+
     const components = await mongodb
       .db('pinkunicorn')
       .collection<Component>('Component')
@@ -258,28 +288,26 @@ function Board(props: BoardProps) {
     ) {
       return;
     }
+    const endPoint = {
+      x: event.clientX - canvasRef.current.getBoundingClientRect().x,
+      y: event.clientY - canvasRef.current.getBoundingClientRect().y,
+    };
     let newShape = {
       _id: new BSON.ObjectId(),
-      x: new BSON.Double(startPoint.x),
-      y: new BSON.Double(startPoint.y),
+      left: startPoint.x,
+      top: startPoint.y,
       z: new BSON.Double(0),
-      width: new BSON.Double(
-        event.clientX -
-          canvasRef.current.getBoundingClientRect().x -
-          startPoint.x,
-      ),
-      height: new BSON.Double(
-        event.clientY -
-          canvasRef.current.getBoundingClientRect().y -
-          startPoint.y,
-      ),
+      right: endPoint.x,
+      bottom: endPoint.y,
       strokeColor: hex2Rgb(color),
-      strokeWidth: 1,
+      strokeWidth: new BSON.Double(1),
     } as any;
     if (tool == 'circle') {
       newShape.shape = 'circle';
     } else if (tool == 'rectangle') {
       newShape.shape = 'rectangle';
+    } else if (tool == 'line') {
+      newShape.shape = 'line';
     }
     setNewShape(newShape);
     redraw(contextRef.current, shapes, canvasWidth, canvasHeight, true);
