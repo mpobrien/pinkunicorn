@@ -137,19 +137,20 @@ function redraw(
 
   for (var i = 0; i < components.length; i++) {
     const component = components[i];
+    context.strokeStyle = '#000000';
     if (component.strokeColor) {
       const hexColor = rgbToHex(component.strokeColor);
       context.strokeStyle = '#' + hexColor;
-    } else {
-      context.strokeStyle = '#000000';
     }
-    //if(component.fillColor){
-    //}
 
-    if (component.shape == 'line') {
+    if (component.shape == 'path') {
       context.beginPath();
-      context.moveTo(component.left, component.top);
-      context.lineTo(component.right, component.bottom);
+      if (component.points.length > 0) {
+        context.moveTo(component.points[0].x, component.points[0].y);
+      }
+      for (var j = 0; j < component.points.length; j++) {
+        context.lineTo(component.points[j].x, component.points[j].y);
+      }
       context.stroke();
     }
     if (component.shape == 'circle') {
@@ -194,6 +195,7 @@ function Board(props: BoardProps) {
   const [tool, setTool] = React.useState<string>('circle');
   const [shapes, setShapes] = React.useState<any>();
   const [newShape, setNewShape] = React.useState<any>();
+  const [points, setPoints] = React.useState<any>();
   const [fetched, setFetched] = React.useState<boolean>();
   const [color, setColor] = React.useState<string>();
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
@@ -258,6 +260,7 @@ function Board(props: BoardProps) {
     }
     setIsDrawing(false);
     setStartPoint(null);
+    setPoints([]);
     const mongodb = props.user.mongoClient('mongodb-atlas');
 
     let [left, right, top, bottom] = [
@@ -272,7 +275,21 @@ function Board(props: BoardProps) {
 
     newShape.top = new BSON.Double(Math.min(top, bottom));
     newShape.bottom = new BSON.Double(Math.max(top, bottom));
-    console.log(newShape);
+    if (newShape.shape == 'path') {
+      newShape.left = new BSON.Double(
+        Math.min(...newShape.points.map((p: any) => p.x)),
+      );
+      newShape.right = new BSON.Double(
+        Math.max(...newShape.points.map((p: any) => p.x)),
+      );
+
+      newShape.top = new BSON.Double(
+        Math.min(...newShape.points.map((p: any) => p.y)),
+      );
+      newShape.bottom = new BSON.Double(
+        Math.max(...newShape.points.map((p: any) => p.y)),
+      );
+    }
 
     const components = await mongodb
       .db('pinkunicorn')
@@ -292,22 +309,52 @@ function Board(props: BoardProps) {
       x: event.clientX - canvasRef.current.getBoundingClientRect().x,
       y: event.clientY - canvasRef.current.getBoundingClientRect().y,
     };
-    let newShape = {
-      _id: new BSON.ObjectId(),
-      left: startPoint.x,
-      top: startPoint.y,
-      z: new BSON.Double(0),
-      right: endPoint.x,
-      bottom: endPoint.y,
-      strokeColor: hex2Rgb(color),
-      strokeWidth: new BSON.Double(1),
-    } as any;
-    if (tool == 'circle') {
-      newShape.shape = 'circle';
-    } else if (tool == 'rectangle') {
-      newShape.shape = 'rectangle';
+    let newShape: any;
+    if (tool == 'path') {
+      let newPoints = (points || []).concat([
+        {x: new BSON.Double(endPoint.x), y: new BSON.Double(endPoint.y)},
+      ]);
+      newShape = {
+        _id: new BSON.ObjectId(),
+        left: startPoint.x,
+        top: startPoint.y,
+        z: new BSON.Double(0),
+        right: endPoint.x,
+        bottom: endPoint.y,
+        strokeColor: hex2Rgb(color),
+        strokeWidth: new BSON.Double(1),
+        points: newPoints,
+        shape: 'path',
+      };
+      setPoints(newPoints);
     } else if (tool == 'line') {
-      newShape.shape = 'line';
+      newShape = {
+        _id: new BSON.ObjectId(),
+        left: Math.min(startPoint.x, endPoint.x),
+        right: Math.max(startPoint.x, endPoint.x),
+        top: Math.min(startPoint.y, endPoint.y),
+        bottom: Math.max(startPoint.y, endPoint.y),
+        z: new BSON.Double(0),
+        strokeColor: hex2Rgb(color),
+        strokeWidth: new BSON.Double(1),
+        shape: 'path',
+        points: [
+          {x: new BSON.Double(startPoint.x), y: new BSON.Double(startPoint.y)},
+          {x: new BSON.Double(endPoint.x), y: new BSON.Double(endPoint.y)},
+        ],
+      };
+    } else {
+      newShape = {
+        _id: new BSON.ObjectId(),
+        left: startPoint.x,
+        top: startPoint.y,
+        z: new BSON.Double(0),
+        right: endPoint.x,
+        bottom: endPoint.y,
+        strokeColor: hex2Rgb(color),
+        strokeWidth: new BSON.Double(1),
+        shape: tool,
+      };
     }
     setNewShape(newShape);
     redraw(contextRef.current, shapes, canvasWidth, canvasHeight, true);
@@ -322,7 +369,7 @@ function Board(props: BoardProps) {
       <select value={tool} onChange={e => setTool(e.target.value)}>
         <option value="circle">&#9711;</option>
         <option value="rectangle">&#9634;</option>
-        <option value="pencil">&#9998;</option>
+        <option value="path">&#9998;</option>
         <option value="line">&#9144;</option>
       </select>
       <div>
