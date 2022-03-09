@@ -9,12 +9,10 @@ namespace PinkUnicorn.ViewModels
 {
     public class DrawingVievModel : Bindable
     {
-        Realm realm;
+        private Realm realm;
 
         private IQueryable<Component> components;
         public IQueryable<Component> Components { get => components; }
-
-
 
         private SKColor strokeColor;
         public SKColor StrokeColor { get => strokeColor; set => SetAndRaise(ref strokeColor, value); }
@@ -23,7 +21,6 @@ namespace PinkUnicorn.ViewModels
         public float StrokeWidth { get => strokeWidth; set => SetAndRaise(ref strokeWidth, value); }
 
         private SKColor fillColor;
-
         public SKColor FillColor { get => fillColor; set => SetAndRaise(ref fillColor, value); }
 
         public DrawingVievModel(Realm realm)

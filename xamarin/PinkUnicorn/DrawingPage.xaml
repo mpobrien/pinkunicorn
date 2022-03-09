@@ -2,15 +2,29 @@
 <ContentPage xmlns="http://xamarin.com/schemas/2014/forms"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:skia="clr-namespace:SkiaSharp.Views.Forms;assembly=SkiaSharp.Views.Forms"
+             xmlns:xct="http://xamarin.com/schemas/2020/toolkit"
+             xmlns:colorpicker="clr-namespace:ColorPicker;assembly=ColorPicker"
+             xmlns:ios="clr-namespace:Xamarin.Forms.PlatformConfiguration.iOSSpecific;assembly=Xamarin.Forms.Core"
+             xmlns:sharpnado="clr-namespace:Sharpnado.MaterialFrame;assembly=Sharpnado.MaterialFrame"
              x:Class="PinkUnicorn.DrawingPage"
-             Title="Tap Toggle Fill">
-    <skia:SKCanvasView PaintSurface="OnCanvasViewPaintSurface"
-                       EnableTouchEvents="True" Touch="canvasView_Touch"
-                       x:Name="canvasView">
-        <skia:SKCanvasView.GestureRecognizers>
-            <PanGestureRecognizer PanUpdated="PanGestureRecognizer_PanUpdated" />
-            <PinchGestureRecognizer PinchUpdated="PinchGestureRecognizer_PinchUpdated" /> 
-            <TapGestureRecognizer Tapped="TapGestureRecognizer_Tapped" />
-        </skia:SKCanvasView.GestureRecognizers>
-    </skia:SKCanvasView>
- </ContentPage>
+             Title="Draw"
+             ios:Page.UseSafeArea="true">
+    <AbsoluteLayout>
+        <skia:SKCanvasView PaintSurface="OnCanvasViewPaintSurface"
+                           EnableTouchEvents="True" Touch="canvasView_Touch"
+                           x:Name="canvasView"
+                           AbsoluteLayout.LayoutBounds="0,0,1,1"
+                           AbsoluteLayout.LayoutFlags="All">
+        </skia:SKCanvasView>
+        <sharpnado:MaterialFrame
+            AbsoluteLayout.LayoutBounds="0.1,0.9,1,0.1"
+            AbsoluteLayout.LayoutFlags="All">
+            <StackLayout Orientation="Horizontal">
+                <Label Text="TEST"/>
+                <Label Text="TEST"/>
+                <Label Text="TEST"/>
+                <Label Text="TEST"/>
+            </StackLayout>
+        </sharpnado:MaterialFrame>
+    </AbsoluteLayout>
+</ContentPage>

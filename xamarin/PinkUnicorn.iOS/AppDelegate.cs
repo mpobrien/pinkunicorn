@@ -1,9 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-
+﻿using ColorPicker.iOS;
 using Foundation;
 using UIKit;
+using Xamarin.Forms;
 
 namespace PinkUnicorn.iOS
 {
@@ -22,7 +20,9 @@ namespace PinkUnicorn.iOS
         //
         public override bool FinishedLaunching(UIApplication app, NSDictionary options)
         {
-            global::Xamarin.Forms.Forms.Init();
+            Forms.Init();
+            ColorPickerEffects.Init();
+
             LoadApplication(new App());
 
             return base.FinishedLaunching(app, options);
