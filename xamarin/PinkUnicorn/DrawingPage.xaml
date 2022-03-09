@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+<ContentPage xmlns="http://xamarin.com/schemas/2014/forms"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:skia="clr-namespace:SkiaSharp.Views.Forms;assembly=SkiaSharp.Views.Forms"
+             x:Class="PinkUnicorn.DrawingPage"
+             Title="Tap Toggle Fill">
+    <skia:SKCanvasView PaintSurface="OnCanvasViewPaintSurface"
+                       EnableTouchEvents="True" Touch="canvasView_Touch"
+                       x:Name="canvasView">
+        <skia:SKCanvasView.GestureRecognizers>
+            <PanGestureRecognizer PanUpdated="PanGestureRecognizer_PanUpdated" />
+            <PinchGestureRecognizer PinchUpdated="PinchGestureRecognizer_PinchUpdated" /> 
+            <TapGestureRecognizer Tapped="TapGestureRecognizer_Tapped" />
+        </skia:SKCanvasView.GestureRecognizers>
+    </skia:SKCanvasView>
+ </ContentPage>
