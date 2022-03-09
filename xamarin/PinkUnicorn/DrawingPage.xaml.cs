@@ -5,27 +5,24 @@ using SkiaSharp.Views.Forms;
 using Xamarin.Forms;
 using PinkUnicorn.Models;
 using System.Linq;
+using PinkUnicorn.ViewModels;
 
 namespace PinkUnicorn
 {
     public partial class DrawingPage : ContentPage
     {
-        readonly Realm realm;
-        readonly IQueryable<Component> components;
         float scale = 1.0f;
         SKPoint offset = SKPoint.Empty;
 
-        public DrawingPage(Realm realm)
+        public DrawingPage(DrawingVievModel vievModel)
         {
             InitializeComponent();
 
-            this.realm = realm;
-            components = realm.All<Component>();
-            components.AsRealmCollection().SubscribeForNotifications((sender, changes, error) =>
-            {
-                canvasView.InvalidateSurface();
-            });
+            ViewModel = vievModel;
+            ViewModel.PropertyChanged += (s, e) => RefreshCanvas(); // a bit rude
         }
+
+        public DrawingVievModel ViewModel { get; }
 
         void OnCanvasViewPaintSurface(object sender, SKPaintSurfaceEventArgs args)
         {
@@ -36,13 +33,13 @@ namespace PinkUnicorn
             canvas.Clear();
             canvas.Scale(scale);
             canvas.Translate(EffectiveOffset);
+            ViewModel.UpdateSubscription(canvas.LocalClipBounds);
 
-            foreach (var c in components)
+            foreach (var c in ViewModel.Components)
             {
                 var strokeColor = c.StrokeColor;
                 if (strokeColor.Alpha == 0) strokeColor = strokeColor.WithAlpha(255);
                 var strokePaint = new SKPaint { Color = strokeColor, StrokeWidth = (float)c.StrokeWidth, IsAntialias = true, IsStroke = true };
-
 
                 var box = new SKRect
                 {
@@ -60,7 +57,7 @@ namespace PinkUnicorn
                         break;
                     case Shape.Path:
                         var path = new SKPath();
-                        path.AddPoly(c.Points.ToArray(), close: true);
+                        path.AddPoly(c.Points.ToArray(), close: c.FillColor != null);
                         canvas.DrawPath(path, strokePaint);
                         break;
                     case Shape.Rectangle:
@@ -70,30 +67,30 @@ namespace PinkUnicorn
             }
         }
 
-        void Refresh()
+        void RefreshCanvas()
         {            
             canvasView.InvalidateSurface();
         }
 
         void PinchGestureRecognizer_PinchUpdated(object sender, PinchGestureUpdatedEventArgs e)
         {
-            Console.WriteLine(e);
+            //Console.WriteLine(e);
             scale *= (float)e.Scale;
-            Refresh();
+            RefreshCanvas();
         }
 
         void TapGestureRecognizer_Tapped(object sender, EventArgs e)
         {
-            Console.WriteLine(e);
+            //Console.WriteLine(e);
             scale = 1.0f;
             offset = SKPoint.Empty;
-            Refresh();
+            RefreshCanvas();
         }
 
         SKPoint panOffset = SKPoint.Empty;
         void PanGestureRecognizer_PanUpdated(object sender, PanUpdatedEventArgs e)
         {
-            Console.WriteLine(e);
+            //Console.WriteLine(e);
             switch (e.StatusType)
             {
                 case GestureStatus.Running:
@@ -108,14 +105,14 @@ namespace PinkUnicorn
                     panOffset = SKPoint.Empty;
                     break;
             }
-            Refresh();
+            RefreshCanvas();
         }
 
         SKPoint EffectiveOffset => offset + panOffset;
 
         void canvasView_Touch(object sender, SKTouchEventArgs e)
         {
-            Console.WriteLine(e);
+            //Console.WriteLine(e);
             switch (e.ActionType)
             {
                 case SKTouchAction.Pressed:

@@ -8,6 +8,7 @@ using Realms.Sync;
 using Xamarin.Forms;
 using Xamarin.Forms.Xaml;
 using Realms.Logging;
+using PinkUnicorn.ViewModels;
 
 namespace PinkUnicorn
 {
@@ -68,7 +69,7 @@ namespace PinkUnicorn
                     new NavigationPage(new LoginPage()) :
                     new NavigationPage(new TaskPage());
                 */
-                var navPage = new DrawingPage(realm);
+                var navPage = new DrawingPage(new DrawingVievModel(realm));
                 NavigationPage.SetHasBackButton(navPage, false);
                 MainPage = navPage;
             }

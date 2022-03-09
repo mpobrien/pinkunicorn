@@ -92,8 +92,7 @@ namespace PinkUnicorn.Models
         [MapTo("fillColor")]
         public int? _FillColor { get; set; }
 
-        public SKColor FillColor { get => new((uint)_FillColor); }
-
+        public SKColor? FillColor { get => _FillColor == null ? null : new((uint)_FillColor); }
     }
 
     public class Owner : RealmObject
