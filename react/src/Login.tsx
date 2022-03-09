@@ -12,16 +12,11 @@ interface LoginProps {
 }
 
 export default function Login(props: LoginProps) {
-  //const [appID, setAppID] = useState<string>('');
-  //const [apiKey, setApiKey] = useState<string>('');
-  //const [username, setUsername] = useState<string>('');
-  //const [password, setPassword] = useState<string>('');
+  const [username, setUsername] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
   const [loginError, setLoginError] = useState<string>('');
-  //const [authProvider, setAuthProvider] = useState<AuthProvider>(
-  //AuthProvider.Anonymous,
-  //);
 
-  const login = async () => {
+  const loginAnonymous = async () => {
     setLoginError('');
     const app: Realm.App = new Realm.App({id: 'pink-unicorn-bvzgq'});
     const credentials = Realm.Credentials.anonymous();
@@ -37,11 +32,25 @@ export default function Login(props: LoginProps) {
     }
   };
 
+  const loginAdmin = async (username: string, password: string) => {
+    setLoginError('');
+    const app: Realm.App = new Realm.App({id: 'pink-unicorn-bvzgq'});
+    const credentials = Realm.Credentials.emailPassword(username, password);
+    try {
+      // Authenticate the user
+      const user: Realm.User = await app.logIn(credentials);
+      if (props.setApp) {
+        props!.setApp(app);
+      }
+      return user;
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
   return (
     <form method="post" action="/form" autoComplete="off">
-      <div className="input-group">
-        <label>Base URL</label>
-      </div>
+      <div></div>
       {/*
       <div className="input-group">
         <br />
@@ -93,10 +102,37 @@ export default function Login(props: LoginProps) {
         */}
 
       <div className="auth-wrapper">
+        <h3>User Login</h3>
         <button
           onClick={e => {
             e.preventDefault();
-            login();
+            loginAnonymous();
+          }}>
+          log in
+        </button>
+      </div>
+      <div className="auth-wrapper">
+        <h3>Admin Login</h3>
+        <div className="input-group">
+          <label>Username</label>
+          <input
+            type="text"
+            onChange={e => setUsername(e.target.value)}
+            value={username}
+          />
+        </div>
+        <div className="input-group">
+          <label>Password</label>
+          <input
+            type="password"
+            onChange={e => setPassword(e.target.value)}
+            value={password}
+          />
+        </div>
+        <button
+          onClick={e => {
+            e.preventDefault();
+            loginAdmin(username, password);
           }}>
           log in
         </button>
