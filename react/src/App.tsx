@@ -312,7 +312,10 @@ function Board(props: BoardProps) {
     newShape.bottom = new BSON.Double(Math.max(top, bottom) - offset.y);
     if (newShape.shape == 'path') {
       newShape.points = newShape.points.map((point: {x: number; y: number}) => {
-        return {x: point.x - offset.x, y: point.y - offset.y};
+        return {
+          x: new BSON.Double(point.x - offset.x),
+          y: new BSON.Double(point.y - offset.y),
+        };
       });
       newShape.left = new BSON.Double(
         Math.min(...newShape.points.map((p: any) => p.x)),
