@@ -10,6 +10,7 @@ struct ShapeComponent {
     var right: Double = 0.0
     var bottom: Double = 0.0
     var left: Double = 0.0
+    var z: Double = 0
     var points: [Point] = []
 
     mutating func reset() {
@@ -19,7 +20,7 @@ struct ShapeComponent {
 }
 
 struct CanvasView: View {
-    @ObservedResults(Component.self) private var components
+    @ObservedResults(Component.self, sortDescriptor: SortDescriptor(keyPath: \Component.z, ascending: true)) private var components
     @Environment(\.realm) private var realm
 
     // Controls
@@ -141,6 +142,7 @@ struct CanvasView: View {
                                 currentComponent.strokeWidth = strokeWidth
                                 currentComponent.fillColor = isFillable ? bgColor.hexaInt ?? 0 : nil
                                 currentComponent.points.append(Point(x: newPoint.x, y: newPoint.y))
+                                currentComponent.z = (components.last?.z ?? 0 + 1)
                             } else {
                                 if currentComponent.points.count > 1 {
                                     currentComponent.points[1] = Point(x: newPoint.x, y: newPoint.y)
@@ -155,6 +157,7 @@ struct CanvasView: View {
                                 currentComponent.strokeWidth = strokeWidth
                                 currentComponent.fillColor = isFillable ? bgColor.hexaInt ?? 0 : nil
                                 currentComponent.points.append(Point(x: newPoint.x, y: newPoint.y))
+                                currentComponent.z = (components.last?.z ?? 0 + 1)
                             } else {
                                 currentComponent.points.append(Point(x: newPoint.x, y: newPoint.y))
                             }

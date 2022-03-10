@@ -24,7 +24,7 @@ class Component: Object, ObjectKeyIdentifiable {
         component.right = shapeComponent.right - offset.width
         component.bottom = shapeComponent.bottom - offset.height
         component.left = shapeComponent.left - offset.width
-        component.z = 0.0
+        component.z = shapeComponent.z
         shapeComponent.points.forEach { point in
             component.points.append(Point(x: point.x - offset.width, y: point.y - offset.height))
         }
