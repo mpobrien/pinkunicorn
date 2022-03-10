@@ -2,7 +2,12 @@ import SwiftUI
 import RealmSwift
 
 struct LoginView: View {
-    @State var user: User? = app.currentUser
+    @State var user: User? = app.currentUser {
+        didSet {
+            isLoggout = user == nil ? true : false
+        }
+    }
+    @State var isLoggout: Bool = false
     @State var errorMessage: String?
 
     @State var username: String = ""
@@ -10,9 +15,20 @@ struct LoginView: View {
 
     var body: some View {
         VStack {
+            NavigationLink(destination: Text("Please Login"), isActive: $isLoggout) {}
             if let user = self.user {
                 AsyncView()
                     .environment(\.realmConfiguration, user.flexibleSyncConfiguration())
+                Button("Logout") {
+                    Task {
+                        do {
+                            _ = try await user.logOut()
+                            self.user = nil
+                        } catch {
+                            self.errorMessage = error.localizedDescription
+                        }
+                    }
+                }
             } else {
                 Text("User Login")
                 Button("Login") {

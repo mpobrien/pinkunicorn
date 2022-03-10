@@ -19,8 +19,8 @@ struct ShapeComponent {
 }
 
 struct CanvasView: View {
-    @ObservedResults(Component.self) var components
-    @Environment(\.realm) var realm
+    @ObservedResults(Component.self) private var components
+    @Environment(\.realm) private var realm
 
     // Controls
     @State private var bgColor = Color(.sRGB, red: 0.98, green: 0.9, blue: 0.2)
@@ -35,6 +35,9 @@ struct CanvasView: View {
     @State private var previousOffset = CGSize.zero
     @State private var offset = CGSize.zero
 
+    // Zooming
+    @State private var scale: CGFloat = 1.0
+
     var body: some View {
         VStack {
             ZStack {
@@ -42,46 +45,45 @@ struct CanvasView: View {
                     ForEach(components) { component in
                         switch component.shape {
                         case .path:
-                            if let fillColor = component.fillColor {
-                                DrawShape(points: component.points.map { $0 }, offset: offset)
+                            if case let .int(fillColor) = component.fillColor {
+                                DrawShape(points: component.points.map { $0 }, offset: offset, scale: scale)
                                     .fill(Color(hex: fillColor))
                             } else {
-                                DrawShape(points: component.points.map { $0 }, offset: offset)
+                                DrawShape(points: component.points.map { $0 }, offset: offset, scale: scale)
                                     .stroke(lineWidth: component.strokeWidth)
-                                    .foregroundColor(Color(hex: component.strokeColor))
+                                    .foregroundColor(Color(hex: component.strokeColor.intValue ?? 0))
                             }
                         case .circle:
-                            if let fillColor = component.fillColor {
-                                DrawCircularShape(component: component, offset: offset)
-                                    .fill(Color(hex: fillColor))
+                            if case let .int(fillColor) = component.fillColor {
+                                DrawCircularShape(component: component, offset: offset, scale: scale)
+                                    .fill(Color(hex:  fillColor))
                             } else {
-                                DrawCircularShape(component: component, offset: offset)
+                                DrawCircularShape(component: component, offset: offset, scale: scale)
                                     .stroke(lineWidth: component.strokeWidth)
-                                    .foregroundColor(Color(hex: component.strokeColor))
+                                    .foregroundColor(Color(hex: component.strokeColor.intValue ?? 0))
                             }
                         case .rectangle:
-                            if let fillColor = component.fillColor {
-                                DrawRectangleShape(component: component, offset: offset)
-                                    .fill(Color(hex: fillColor))
+                            if case let .int(fillColor) = component.fillColor {
+                                DrawRectangleShape(component: component, offset: offset, scale: scale)
+                                    .fill(Color(hex:  fillColor))
                             } else {
-                                DrawRectangleShape(component: component, offset: offset)
+                                DrawRectangleShape(component: component, offset: offset, scale: scale)
                                     .stroke(lineWidth: component.strokeWidth)
-                                    .foregroundColor(Color(hex: component.strokeColor))
+                                    .foregroundColor(Color(hex: component.strokeColor.intValue ?? 0))
                             }
                         default: EmptyView()
                         }
                     }
                 }
+                .scaleEffect(scale)
                 Canvas { context, size in
                     switch currentComponent.shape {
                     case .path:
                         guard currentComponent.points.count > 1 else { return }
-                        print("Drawing path")
                         context.stroke(
                             Path() { path in
                                 path.move(to: CGPoint(x: currentComponent.points[0].x, y: currentComponent.points[0].y))
                                 (1...(currentComponent.points.count - 1)).forEach { index in
-                                    print("Adding lines")
                                     path.addLine(to: CGPoint(x: currentComponent.points[index].x, y: currentComponent.points[index].y))
                                 }
                             },
@@ -125,6 +127,7 @@ struct CanvasView: View {
                         break
                     }
                 }
+                .scaleEffect(scale)
             }
             .gesture(
                 DragGesture(minimumDistance: 0, coordinateSpace: .local)
@@ -182,13 +185,19 @@ struct CanvasView: View {
                             currentComponent.top = currentComponent.points.sorted(by: { $0.y < $1.y }).first!.y
                             currentComponent.right = currentComponent.points.sorted(by: { $0.x > $1.x }).first!.x
                             currentComponent.bottom = currentComponent.points.sorted(by: { $0.y > $1.y }).first!.y
+                            $components.append(Component.make(shapeComponent: currentComponent, offset: offset))
+                            currentComponent.reset()
                         case .unknown:
                             previousOffset = .zero
                         }
-                        $components.append(Component.make(shapeComponent: currentComponent))
-                        currentComponent.reset()
                     })
-                )
+            )
+            .gesture(
+                MagnificationGesture()
+                    .onChanged { value in
+                        self.scale = value.magnitude
+                    }
+            )
         }
         .toolbar {
             ToolbarItemGroup(placement: .bottomBar) {
@@ -250,10 +259,13 @@ struct CanvasView: View {
     func updateSubscription(offset: CGSize) {
         let subs = realm.subscriptions
         if let offsetSubscription = subs.first(named: "offset") {
-            subs.write {
+            subs.write({
+                print("-----> New query update left < \(UIScreen.main.bounds.width - offset.width) && right > \((0 - offset.width)) && top < \(UIScreen.main.bounds.height - offset.height) && bottom > \(0 - offset.height)")
                 offsetSubscription.update(toType: Component.self) {
-                    $0.left < (UIScreen.main.bounds.width + offset.width) && $0.right > (0 + offset.width) && $0.top < (UIScreen.main.bounds.height + offset.height) && $0.bottom > (0 + offset.height)
+                    $0.left < (UIScreen.main.bounds.width - offset.width) && $0.right > (0 - offset.width) && $0.top < (UIScreen.main.bounds.height - offset.height) && $0.bottom > (0 - offset.height)
                 }
+            }) { error in
+                print("Query update completed with error \(String(describing: error))")
             }
         }
     }
@@ -262,6 +274,7 @@ struct CanvasView: View {
 struct DrawShape: Shape {
     var points: [Point]
     var offset: CGSize
+    var scale: CGFloat
 
     func path(in rect: CGRect) -> Path {
         var path = Path()
@@ -280,18 +293,20 @@ struct DrawShape: Shape {
 struct DrawCircularShape: Shape {
     var component: Component
     var offset: CGSize
+    var scale: CGFloat
 
     func path(in rect: CGRect) -> Path {
-        return Path(ellipseIn: CGRect(origin:  CGPoint(x: component.left + offset.width, y: component.top + offset.height), size: CGSize(width: (component.right - component.left) + offset.width, height: (component.bottom - component.top) + offset.height)))
+        return Path(ellipseIn: CGRect(origin:  CGPoint(x: component.left + offset.width, y: component.top + offset.height), size: CGSize(width: (component.right - component.left), height: (component.bottom - component.top))))
     }
 }
 
 struct DrawRectangleShape: Shape {
     var component: Component
     var offset: CGSize
+    var scale: CGFloat
 
     func path(in rect: CGRect) -> Path {
-        return Path(CGRect(origin:  CGPoint(x: component.left + offset.width, y: component.top +  offset.height), size: CGSize(width: (component.right - component.left) + offset.width, height: (component.bottom - component.top) + offset.height)))
+        return Path(CGRect(origin:  CGPoint(x: component.left + offset.width, y: component.top +  offset.height), size: CGSize(width: (component.right - component.left), height: (component.bottom - component.top))))
     }
 }
 
