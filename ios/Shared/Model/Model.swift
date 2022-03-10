@@ -23,7 +23,7 @@ class Component: Object, ObjectKeyIdentifiable {
         component.right = shapeComponent.right
         component.bottom = shapeComponent.bottom
         component.left = shapeComponent.left
-        component.z = shapeComponent.z
+        component.z = 0.0
         component.points.append(objectsIn: shapeComponent.points)
         return component
     }

@@ -67,8 +67,12 @@ struct AsyncView: View {
                         do {
                             let realm = try await Realm(configuration: configuration, downloadBeforeOpen: .always)
                             let subs = realm.subscriptions
+                            guard subs.first(named: "offset") == nil else {
+                                isSynced = true
+                                return
+                            }
                             try await subs.write {
-                                subs.append(QuerySubscription<Component> {
+                                subs.append(QuerySubscription<Component>(name: "offset") {
                                     $0.left < UIScreen.main.bounds.width && $0.right > 0 && $0.top < UIScreen.main.bounds.height && $0.bottom > 0
                                 })
                             }

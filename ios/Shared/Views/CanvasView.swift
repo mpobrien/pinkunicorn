@@ -10,14 +10,9 @@ struct ShapeComponent {
     var right: Double = 0.0
     var bottom: Double = 0.0
     var left: Double = 0.0
-    var z: Double = 0.0
     var points: [Point] = []
 
     mutating func reset() {
-        self.left = 0.0
-        self.right = 0.0
-        self.top = 0.0
-        self.bottom = 0.0
         self.points = []
         self.shape = .unknown
     }
@@ -25,12 +20,20 @@ struct ShapeComponent {
 
 struct CanvasView: View {
     @ObservedResults(Component.self) var components
+    @Environment(\.realm) var realm
 
+    // Controls
     @State private var bgColor = Color(.sRGB, red: 0.98, green: 0.9, blue: 0.2)
     @State private var strokeWidth: CGFloat = 1.0
     @State private var editMode: ShapeType = .unknown
     @State private var isFillable: Bool = false
+
+    // Editable component
     @State private var currentComponent: ShapeComponent = ShapeComponent()
+
+    // Dragging
+    @State private var previousOffset = CGSize.zero
+    @State private var offset = CGSize.zero
 
     var body: some View {
         VStack {
@@ -40,28 +43,28 @@ struct CanvasView: View {
                         switch component.shape {
                         case .path:
                             if let fillColor = component.fillColor {
-                                DrawShape(points: component.points.map { $0 })
+                                DrawShape(points: component.points.map { $0 }, offset: offset)
                                     .fill(Color(hex: fillColor))
                             } else {
-                                DrawShape(points: component.points.map { $0 })
+                                DrawShape(points: component.points.map { $0 }, offset: offset)
                                     .stroke(lineWidth: component.strokeWidth)
                                     .foregroundColor(Color(hex: component.strokeColor))
                             }
                         case .circle:
                             if let fillColor = component.fillColor {
-                                DrawCircularShape(component: component)
+                                DrawCircularShape(component: component, offset: offset)
                                     .fill(Color(hex: fillColor))
                             } else {
-                                DrawCircularShape(component: component)
+                                DrawCircularShape(component: component, offset: offset)
                                     .stroke(lineWidth: component.strokeWidth)
                                     .foregroundColor(Color(hex: component.strokeColor))
                             }
                         case .rectangle:
                             if let fillColor = component.fillColor {
-                                DrawRectangleShape(component: component)
+                                DrawRectangleShape(component: component, offset: offset)
                                     .fill(Color(hex: fillColor))
                             } else {
-                                DrawRectangleShape(component: component)
+                                DrawRectangleShape(component: component, offset: offset)
                                     .stroke(lineWidth: component.strokeWidth)
                                     .foregroundColor(Color(hex: component.strokeColor))
                             }
@@ -70,38 +73,51 @@ struct CanvasView: View {
                     }
                 }
                 Canvas { context, size in
-                    print("Drawing")
                     switch currentComponent.shape {
                     case .path:
                         guard currentComponent.points.count > 1 else { return }
+                        print("Drawing path")
                         context.stroke(
                             Path() { path in
                                 path.move(to: CGPoint(x: currentComponent.points[0].x, y: currentComponent.points[0].y))
                                 (1...(currentComponent.points.count - 1)).forEach { index in
+                                    print("Adding lines")
                                     path.addLine(to: CGPoint(x: currentComponent.points[index].x, y: currentComponent.points[index].y))
                                 }
                             },
                             with: .color(Color(hex: currentComponent.strokeColor)),
                             lineWidth: currentComponent.strokeWidth)
                     case .circle:
+                        guard currentComponent.points.count > 1 else { return }
+                        let x = currentComponent.points[0].x > currentComponent.points[1].x ? currentComponent.points[1].x : currentComponent.points[0].x
+                        let y = currentComponent.points[0].y > currentComponent.points[1].y ? currentComponent.points[1].y : currentComponent.points[0].y
+                        let width = currentComponent.points[1].x > currentComponent.points[0].x ? (currentComponent.points[1].x - currentComponent.points[0].x) : (currentComponent.points[0].x - currentComponent.points[1].x)
+                        let height = currentComponent.points[1].y > currentComponent.points[0].y ? (currentComponent.points[1].y - currentComponent.points[0].y) : (currentComponent.points[0].y - currentComponent.points[1].y)
                         if let fillColor = currentComponent.fillColor {
+                            guard currentComponent.points.count > 1 else { return }
                             context.fill(
-                                Path(ellipseIn: CGRect(origin: CGPoint(x: currentComponent.left, y: currentComponent.top), size: CGSize(width: currentComponent.right - currentComponent.left, height: currentComponent.bottom - currentComponent.top))),
+                                Path(ellipseIn: CGRect(origin: CGPoint(x: x, y: y), size: CGSize(width: width, height: height))),
                                 with: .color(Color(hex: fillColor)))
                         } else {
+                            guard currentComponent.points.count > 1 else { return }
                             context.stroke(
-                                Path(ellipseIn: CGRect(origin: CGPoint(x: currentComponent.left, y: currentComponent.top), size: CGSize(width: currentComponent.right - currentComponent.left, height: currentComponent.bottom - currentComponent.top))),
+                                Path(ellipseIn: CGRect(origin: CGPoint(x: x, y: y), size: CGSize(width: width, height: height))),
                                 with: .color(Color(hex: currentComponent.strokeColor)),
                                 lineWidth: currentComponent.strokeWidth)
                         }
                     case .rectangle:
+                        guard currentComponent.points.count > 1 else { return }
+                        let x = currentComponent.points[0].x > currentComponent.points[1].x ? currentComponent.points[1].x : currentComponent.points[0].x
+                        let y = currentComponent.points[0].y > currentComponent.points[1].y ? currentComponent.points[1].y : currentComponent.points[0].y
+                        let width = currentComponent.points[1].x > currentComponent.points[0].x ? (currentComponent.points[1].x - currentComponent.points[0].x) : (currentComponent.points[0].x - currentComponent.points[1].x)
+                        let height = currentComponent.points[1].y > currentComponent.points[0].y ? (currentComponent.points[1].y - currentComponent.points[0].y) : (currentComponent.points[0].y - currentComponent.points[1].y)
                         if let fillColor = currentComponent.fillColor {
                             context.fill(
-                                Path(CGRect(origin: CGPoint(x: currentComponent.left, y: currentComponent.top), size: CGSize(width: currentComponent.right - currentComponent.left, height: currentComponent.bottom - currentComponent.top))),
+                                Path(CGRect(origin: CGPoint(x: x, y: y), size: CGSize(width: width, height: height))),
                                 with: .color(Color(hex: fillColor)))
                         } else {
                             context.stroke(
-                                Path(CGRect(origin: CGPoint(x: currentComponent.left, y: currentComponent.top), size: CGSize(width: currentComponent.right - currentComponent.left, height: currentComponent.bottom - currentComponent.top))),
+                                Path(CGRect(origin: CGPoint(x: x, y: y), size: CGSize(width: width, height: height))),
                                 with: .color(Color(hex: currentComponent.strokeColor)),
                                 lineWidth: currentComponent.strokeWidth)
                         }
@@ -109,52 +125,70 @@ struct CanvasView: View {
                         break
                     }
                 }
-                .gesture(
-                    DragGesture(minimumDistance: 0, coordinateSpace: .local)
-                        .onChanged({ value in
-                            let newPoint = value.location
-                            switch editMode {
-                            case .circle, .rectangle:
-                                if value.translation.width + value.translation.height == 0 {
-                                    currentComponent.shape = editMode
-                                    currentComponent.strokeColor = bgColor.hexaInt ?? 0
-                                    currentComponent.strokeWidth = strokeWidth
-                                    currentComponent.fillColor = isFillable ? bgColor.hexaInt ?? 0 : nil
-                                    currentComponent.left = newPoint.x
-                                    currentComponent.top = newPoint.y
-                                    currentComponent.right = newPoint.x
-                                    currentComponent.bottom = newPoint.y
-                                } else {
-                                    currentComponent.right = newPoint.x
-                                    currentComponent.bottom = newPoint.y
-                                }
-                            case .path:
-                                if value.translation.width + value.translation.height == 0 {
-                                    currentComponent.shape = editMode
-                                    currentComponent.strokeColor = bgColor.hexaInt ?? 0
-                                    currentComponent.strokeWidth = strokeWidth
-                                    currentComponent.fillColor = isFillable ? bgColor.hexaInt ?? 0 : nil
-                                    currentComponent.points.append(Point(x: newPoint.x, y: newPoint.y))
+            }
+            .gesture(
+                DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                    .onChanged({ value in
+                        let newPoint = value.location
+                        switch editMode {
+                        case .circle, .rectangle:
+                            if value.translation.width + value.translation.height == 0 {
+                                currentComponent.shape = editMode
+                                currentComponent.strokeColor = bgColor.hexaInt ?? 0
+                                currentComponent.strokeWidth = strokeWidth
+                                currentComponent.fillColor = isFillable ? bgColor.hexaInt ?? 0 : nil
+                                currentComponent.points.append(Point(x: newPoint.x, y: newPoint.y))
+                            } else {
+                                if currentComponent.points.count > 1 {
+                                    currentComponent.points[1] = Point(x: newPoint.x, y: newPoint.y)
                                 } else {
                                     currentComponent.points.append(Point(x: newPoint.x, y: newPoint.y))
                                 }
-                            case .unknown:
-                                break
                             }
-
-                        })
-                        .onEnded({ value in
-                            let newPoint = value.location
-                            guard newPoint.x != currentComponent.left && newPoint.y != currentComponent.right else {
+                        case .path:
+                            if value.translation.width + value.translation.height == 0 {
+                                currentComponent.shape = editMode
+                                currentComponent.strokeColor = bgColor.hexaInt ?? 0
+                                currentComponent.strokeWidth = strokeWidth
+                                currentComponent.fillColor = isFillable ? bgColor.hexaInt ?? 0 : nil
+                                currentComponent.points.append(Point(x: newPoint.x, y: newPoint.y))
+                            } else {
+                                currentComponent.points.append(Point(x: newPoint.x, y: newPoint.y))
+                            }
+                        case .unknown:
+                            break
+                        }
+                    })
+                    .onChanged({ gesture in
+                        switch editMode {
+                        case .unknown:
+                            let currentWidth = gesture.translation.width - previousOffset.width
+                            let currentHeight = gesture.translation.height - previousOffset.height
+                            previousOffset = gesture.translation
+                            offset = CGSize(width: offset.width + currentWidth, height: offset.height + currentHeight)
+                            updateSubscription(offset: offset)
+                        default: break
+                        }
+                    })
+                    .onEnded({ value in
+                        switch editMode {
+                        case .circle, .rectangle, .path:
+                            guard currentComponent.points.count > 1,
+                                  currentComponent.points[0].x != currentComponent.points[1].x || currentComponent.points[0].y != currentComponent.points[1].y else {
                                 currentComponent.reset()
                                 return
                             }
-                            $components.append(Component.make(shapeComponent: currentComponent))
-                            currentComponent.reset()
-                        })
-                    )
-
-            }
+                            currentComponent.left = currentComponent.points.sorted(by: { $0.x < $1.x }).first!.x
+                            currentComponent.top = currentComponent.points.sorted(by: { $0.y < $1.y }).first!.y
+                            currentComponent.right = currentComponent.points.sorted(by: { $0.x > $1.x }).first!.x
+                            currentComponent.bottom = currentComponent.points.sorted(by: { $0.y > $1.y }).first!.y
+                        case .unknown:
+                            previousOffset = .zero
+                        }
+                        $components.append(Component.make(shapeComponent: currentComponent))
+                        currentComponent.reset()
+                    })
+                )
         }
         .toolbar {
             ToolbarItemGroup(placement: .bottomBar) {
@@ -212,10 +246,22 @@ struct CanvasView: View {
             }
         }
     }
+
+    func updateSubscription(offset: CGSize) {
+        let subs = realm.subscriptions
+        if let offsetSubscription = subs.first(named: "offset") {
+            subs.write {
+                offsetSubscription.update(toType: Component.self) {
+                    $0.left < (UIScreen.main.bounds.width + offset.width) && $0.right > (0 + offset.width) && $0.top < (UIScreen.main.bounds.height + offset.height) && $0.bottom > (0 + offset.height)
+                }
+            }
+        }
+    }
 }
 
 struct DrawShape: Shape {
     var points: [Point]
+    var offset: CGSize
 
     func path(in rect: CGRect) -> Path {
         var path = Path()
@@ -223,9 +269,9 @@ struct DrawShape: Shape {
             return path
         }
 
-        path.move(to: CGPoint(x: points[0].x, y: points[0].y))
+        path.move(to: CGPoint(x: points[0].x + offset.width, y: points[0].y + offset.height))
         for index in 1...(points.count - 1) {
-            path.addLine(to: CGPoint(x: points[index].x, y: points[index].y))
+            path.addLine(to: CGPoint(x: points[index].x + offset.width, y: points[index].y + offset.height))
         }
         return path
     }
@@ -233,17 +279,19 @@ struct DrawShape: Shape {
 
 struct DrawCircularShape: Shape {
     var component: Component
+    var offset: CGSize
 
     func path(in rect: CGRect) -> Path {
-        return Path(ellipseIn: CGRect(origin:  CGPoint(x: component.left, y: component.top), size: CGSize(width: component.right - component.left, height: component.bottom - component.top)))
+        return Path(ellipseIn: CGRect(origin:  CGPoint(x: component.left + offset.width, y: component.top + offset.height), size: CGSize(width: (component.right - component.left) + offset.width, height: (component.bottom - component.top) + offset.height)))
     }
 }
 
 struct DrawRectangleShape: Shape {
     var component: Component
+    var offset: CGSize
 
     func path(in rect: CGRect) -> Path {
-        return Path(CGRect(origin:  CGPoint(x: component.left, y: component.top), size: CGSize(width: component.right - component.left, height: component.bottom - component.top)))
+        return Path(CGRect(origin:  CGPoint(x: component.left + offset.width, y: component.top +  offset.height), size: CGSize(width: (component.right - component.left) + offset.width, height: (component.bottom - component.top) + offset.height)))
     }
 }
 
