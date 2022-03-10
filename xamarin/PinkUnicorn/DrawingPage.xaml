@@ -1,12 +1,16 @@
 ﻿<?xml version="1.0" encoding="UTF-8" ?>
 <ContentPage xmlns="http://xamarin.com/schemas/2014/forms"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:PinkUnicorn"
              xmlns:skia="clr-namespace:SkiaSharp.Views.Forms;assembly=SkiaSharp.Views.Forms"
              xmlns:ios="clr-namespace:Xamarin.Forms.PlatformConfiguration.iOSSpecific;assembly=Xamarin.Forms.Core"
              xmlns:sharpnado="clr-namespace:Sharpnado.MaterialFrame;assembly=Sharpnado.MaterialFrame"
              x:Class="PinkUnicorn.DrawingPage"
              Title="Draw"
              ios:Page.UseSafeArea="true">
+    <ContentPage.Resources>
+        <local:SKColorToFormsColor x:Key="colorConverter" />
+    </ContentPage.Resources>
     <AbsoluteLayout>
         <skia:SKCanvasView PaintSurface="OnCanvasViewPaintSurface"
                            EnableTouchEvents="True" Touch="canvasView_Touch"
@@ -19,11 +23,28 @@
             AbsoluteLayout.LayoutFlags="PositionProportional">
             <StackLayout
                 Orientation="Horizontal">
-                <Slider x:Name="strokeWidthSlider" Maximum="100" Value="{Binding StrokeWidth, Mode=TwoWay}" />
-                <Label Text="{Binding Source={x:Reference strokeWidthSlider}, Path=Value, StringFormat='{0:0}'}" VerticalOptions="Center" />
-                <Switch IsToggled="{Binding EnableFill, Mode=TwoWay}" />
-                <Picker SelectedItem="{Binding Shape}" ItemsSource="{Binding SupportedShapes}"/>
-                <Button Text="Color" x:Name="showColorPickers" Clicked="Button_Clicked"/>
+                <Slider
+                    x:Name="strokeWidthSlider"
+                    Maximum="100"
+                    Value="{Binding StrokeWidth, Mode=TwoWay}"
+                    MinimumTrackColor="{Binding StrokeColor, Mode=OneWay, Converter={StaticResource colorConverter}}"
+                    VerticalOptions="Center" />
+                <Label
+                    Text="{Binding Source={x:Reference strokeWidthSlider}, Path=Value, StringFormat='{0:0}'}"
+                    VerticalOptions="Center" />
+                <Switch
+                    IsToggled="{Binding EnableFill, Mode=TwoWay}"
+                    OnColor="{Binding FillColor, Mode=OneWay, Converter={StaticResource colorConverter}}"
+                    VerticalOptions="Center" />
+                <Picker
+                    SelectedItem="{Binding Shape, Mode=TwoWay}"
+                    ItemsSource="{Binding SupportedShapes}"
+                    VerticalOptions="Center"/>
+                <Button
+                    Text="Color"
+                    x:Name="showColorPickers"
+                    Clicked="Button_Clicked"
+                    VerticalOptions="Center"/>
             </StackLayout>
         </sharpnado:MaterialFrame>
     </AbsoluteLayout>

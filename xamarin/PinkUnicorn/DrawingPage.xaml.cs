@@ -58,28 +58,35 @@ namespace PinkUnicorn
             if (strokeColor.Alpha == 0) strokeColor = strokeColor.WithAlpha(255);
             var strokePaint = new SKPaint { Color = strokeColor, StrokeWidth = (float)c.StrokeWidth, IsAntialias = true, IsStroke = true };
 
+            var fillColor = c.FillColor ?? SKColors.Transparent;
+            if (fillColor != SKColors.Transparent && fillColor.Alpha == 0) fillColor = fillColor.WithAlpha(255);
+            var fillPaint = new SKPaint { Color = fillColor, IsStroke = false };
+
             var box = new SKRect
             {
                 Location = c.TopLeft,
                 Size = c.Size
             };
 
-            switch (c.Shape)
+            foreach (var paint in new[] { fillPaint, strokePaint })
             {
-                case Shape.Circle:
-                    canvas.DrawOval(box, strokePaint);
-                    break;
-                case Shape.Line:
-                    canvas.DrawLine(c.TopLeft, c.BottomRight, strokePaint);
-                    break;
-                case Shape.Path:
-                    var path = new SKPath();
-                    path.AddPoly(c.Points.ToArray(), close: c.FillColor != null);
-                    canvas.DrawPath(path, strokePaint);
-                    break;
-                case Shape.Rectangle:
-                    canvas.DrawRect(box, strokePaint);
-                    break;
+                switch (c.Shape)
+                {
+                    case Shape.Circle:
+                        canvas.DrawOval(box, paint);
+                        break;
+                    case Shape.Line:
+                        canvas.DrawLine(c.TopLeft, c.BottomRight, paint);
+                        break;
+                    case Shape.Path:
+                        var path = new SKPath();
+                        path.AddPoly(c.Points.ToArray(), close: c.FillColor != null);
+                        canvas.DrawPath(path, paint);
+                        break;
+                    case Shape.Rectangle:
+                        canvas.DrawRect(box, paint);
+                        break;
+                }
             }
         }
 
@@ -131,7 +138,8 @@ namespace PinkUnicorn
                         Left = box.Left,
                         Right = box.Right,
                     };
-                    if (shape == Shape.Path) {
+                    if (shape == Shape.Path)
+                    {
                         next.Points = path.Points;
                     }
 
