@@ -7,6 +7,8 @@ using PinkUnicorn.Models;
 using System.Linq;
 using PinkUnicorn.ViewModels;
 using System.Collections.Generic;
+using Xamarin.CommunityToolkit.Extensions;
+using System.Threading.Tasks;
 
 namespace PinkUnicorn
 {
@@ -22,7 +24,16 @@ namespace PinkUnicorn
             ViewModel.PropertyChanged += (s, e) => RefreshCanvas(); // a bit rude
         }
 
-        public DrawingVievModel ViewModel { get; }
+        private DrawingVievModel viewModel;
+
+        public DrawingVievModel ViewModel
+        {
+            get => viewModel; set
+            {
+                viewModel = value;
+                BindingContext = viewModel;
+            }
+        }
 
         readonly SKPaint dotted = new()
         {
@@ -111,7 +122,7 @@ namespace PinkUnicorn
                     var strokeWidth = ViewModel.StrokeWidth;
                     next = new Component
                     {
-                        Shape = ViewModel.Shape,
+                        Shape = shape,
                         StrokeWidth = strokeWidth,
                         StrokeColor = ViewModel.StrokeColor,
                         FillColor = ViewModel.FillColor,
@@ -120,6 +131,9 @@ namespace PinkUnicorn
                         Left = box.Left,
                         Right = box.Right,
                     };
+                    if (shape == Shape.Path) {
+                        next.Points = path.Points;
+                    }
 
                     DrawComponent(canvas, next);
 
@@ -265,6 +279,11 @@ namespace PinkUnicorn
         float Magnitude(SKPoint point)
         {
             return (float)Math.Sqrt(Math.Pow(point.X, 2) + Math.Pow(point.Y, 2));
+        }
+
+        void Button_Clicked(object sender, EventArgs e)
+        {
+            Application.Current.MainPage.Navigation.ShowPopup(new ColorPickerPopup(showColorPickers, ViewModel));
         }
     }
 }
