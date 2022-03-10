@@ -9,7 +9,8 @@ namespace PinkUnicorn.Models
 {
     public enum Shape { Circle, Line, Path, Rectangle, Triangle }
 
-    public class Point : EmbeddedObject {
+    public class Point : EmbeddedObject
+    {
         [MapTo("x")]
         public double X { get; set; }
 
@@ -68,7 +69,7 @@ namespace PinkUnicorn.Models
 
         [MapTo("shape")]
         [Required]
-        private string _Shape { get; set; }
+        private string _Shape { get; set; } 
 
         public Shape Shape
         {
@@ -78,21 +79,27 @@ namespace PinkUnicorn.Models
                 if (Enum.TryParse(_Shape, true, out shape)) return shape;
                 return Shape.Rectangle;
             }
-            set => _Shape = value.ToString();
+            set => _Shape = value.ToString().ToLower();
         }
 
         [MapTo("strokeColor")]
-        public int _StrokeColor { get; set; }
+        private int _StrokeColor { get; set; }
 
-        public SKColor StrokeColor { get => new((uint)_StrokeColor); }
+        public SKColor StrokeColor {
+            get => new((uint)_StrokeColor);
+            set => _StrokeColor = (int)(uint)value;
+        }
 
         [MapTo("strokeWidth")]
         public double StrokeWidth { get; set; }
 
         [MapTo("fillColor")]
-        public int? _FillColor { get; set; }
+        private int? _FillColor { get; set; }
 
-        public SKColor? FillColor { get => _FillColor == null ? null : new((uint)_FillColor); }
+        public SKColor? FillColor {
+            get => _FillColor == null ? null : new((uint)_FillColor);
+            set => _FillColor = (int?)(uint?)value;
+        }
     }
 
     public class Owner : RealmObject

@@ -24,7 +24,55 @@ namespace PinkUnicorn
 
         public DrawingVievModel ViewModel { get; }
 
-        SKPaint dotted = new SKPaint { Color = SKColors.Black, Style = SKPaintStyle.Stroke, PathEffect = SKPathEffect.CreateDash(new float[] { 10, 30 }, 20) };
+        readonly SKPaint dotted = new()
+        {
+            Color = SKColors.Black,
+            Style = SKPaintStyle.Stroke,
+            PathEffect = SKPathEffect.CreateDash(new float[] { 10, 30 }, 20),
+            StrokeCap = SKStrokeCap.Round,
+            StrokeWidth = 4
+        };
+
+        readonly SKPaint solid = new()
+        {
+            Color = SKColors.Black,
+            Style = SKPaintStyle.Stroke,
+            StrokeCap = SKStrokeCap.Round,
+            StrokeWidth = 4
+        };
+
+        void DrawComponent(SKCanvas canvas, Component c)
+        {
+            var strokeColor = c.StrokeColor;
+            if (strokeColor.Alpha == 0) strokeColor = strokeColor.WithAlpha(255);
+            var strokePaint = new SKPaint { Color = strokeColor, StrokeWidth = (float)c.StrokeWidth, IsAntialias = true, IsStroke = true };
+
+            var box = new SKRect
+            {
+                Location = c.TopLeft,
+                Size = c.Size
+            };
+
+            switch (c.Shape)
+            {
+                case Shape.Circle:
+                    canvas.DrawOval(box, strokePaint);
+                    break;
+                case Shape.Line:
+                    canvas.DrawLine(c.TopLeft, c.BottomRight, strokePaint);
+                    break;
+                case Shape.Path:
+                    var path = new SKPath();
+                    path.AddPoly(c.Points.ToArray(), close: c.FillColor != null);
+                    canvas.DrawPath(path, strokePaint);
+                    break;
+                case Shape.Rectangle:
+                    canvas.DrawRect(box, strokePaint);
+                    break;
+            }
+        }
+
+        Component next = null;
         void OnCanvasViewPaintSurface(object sender, SKPaintSurfaceEventArgs args)
         {
             var info = args.Info;
@@ -35,36 +83,52 @@ namespace PinkUnicorn
             canvas.SetMatrix(matrix);
             var bounds = canvas.LocalClipBounds;
             ViewModel.UpdateSubscription(bounds);
-            canvas.DrawLine(bounds.Left, 400, bounds.Right, 400, dotted);
+            canvas.DrawLine(bounds.Left, 400, bounds.Right, 400, dotted); // 400 is the magic number :-)
 
             foreach (var c in ViewModel.Components)
             {
-                var strokeColor = c.StrokeColor;
-                if (strokeColor.Alpha == 0) strokeColor = strokeColor.WithAlpha(255);
-                var strokePaint = new SKPaint { Color = strokeColor, StrokeWidth = (float)c.StrokeWidth, IsAntialias = true, IsStroke = true };
+                DrawComponent(canvas, c);
+            }
 
-                var box = new SKRect
+            if (traced != null)
+            {
+                if (traced.PointCount == 1)
                 {
-                    Location = c.TopLeft,
-                    Size = c.Size
-                };
+                    canvas.DrawPoint(traced.LastPoint, solid);
+                }
+                else if (traced.PointCount > 1)
+                {
+                    var path = traced; // if Shape.Path
+                    var shape = ViewModel.Shape;
+                    if (shape != Shape.Path)
+                    {
+                        path = new SKPath();
+                        path.MoveTo(traced.Points[0]);
+                        path.LineTo(traced.LastPoint);
+                    }
+                    var box = path.Bounds;
 
-                switch (c.Shape)
-                {
-                    case Shape.Circle:
-                        canvas.DrawOval(box, strokePaint);
-                        break;
-                    case Shape.Line:
-                        canvas.DrawLine(c.TopLeft, c.BottomRight, strokePaint);
-                        break;
-                    case Shape.Path:
-                        var path = new SKPath();
-                        path.AddPoly(c.Points.ToArray(), close: c.FillColor != null);
-                        canvas.DrawPath(path, strokePaint);
-                        break;
-                    case Shape.Rectangle:
-                        canvas.DrawRect(box, strokePaint);
-                        break;
+                    var strokeWidth = ViewModel.StrokeWidth;
+                    next = new Component
+                    {
+                        Shape = ViewModel.Shape,
+                        StrokeWidth = strokeWidth,
+                        StrokeColor = ViewModel.StrokeColor,
+                        FillColor = ViewModel.FillColor,
+                        Top = box.Top,
+                        Bottom = box.Bottom,
+                        Left = box.Left,
+                        Right = box.Right,
+                    };
+
+                    DrawComponent(canvas, next);
+
+                    // Add bounding box overlay for current draw op
+                    var scale = canvas.TotalMatrix.ScaleX; // = ScaleY
+                    var paint = solid.Clone(); // dotted PathEffect looks odd under scaling, so use solid for now
+                    paint.StrokeWidth /= scale;
+                    box.Inflate(strokeWidth / 2, strokeWidth / 2);
+                    canvas.DrawRect(box, paint);
                 }
             }
         }
@@ -74,9 +138,48 @@ namespace PinkUnicorn
             canvasView.InvalidateSurface();
         }
 
+        private SKPath? traced;
+        void HandleUserDraw(SKPoint point, bool commitIfSelected)
+        {
+            // Single-finger?
+            if (touchDictionary.Count == 1)
+            {
+                // Invert the matrix
+                if (matrix.TryInvert(out SKMatrix inverseMatrix))
+                {
+                    var transformedPoint = inverseMatrix.MapPoint(point);
+
+                    if (traced != null && commitIfSelected)
+                    {
+                        if (traced.Bounds.Contains(transformedPoint))
+                        {
+                            ViewModel.Commit(next);
+                        }
+                        traced = null;
+                    }
+                    else
+                    {
+                        traced ??= new SKPath();
+                        if (traced.IsEmpty)
+                        {
+                            traced.MoveTo(transformedPoint);
+                        }
+                        else
+                        {
+                            traced.LineTo(transformedPoint);
+                        }
+                    }
+                    canvasView.InvalidateSurface();
+                }
+            }
+            else
+            {
+                traced = null; // cancel
+            }
+        }
 
         // Touch information
-        Dictionary<long, SKPoint> touchDictionary = new Dictionary<long, SKPoint>();
+        Dictionary<long, SKPoint> touchDictionary = new();
         void canvasView_Touch(object sender, SKTouchEventArgs e)
         {
             e.Handled = true;
@@ -90,25 +193,16 @@ namespace PinkUnicorn
                     {
                         touchDictionary.Add(e.Id, point);
                     }
+                    HandleUserDraw(point, true);
                     break;
 
                 case SKTouchAction.Moved:
                     if (touchDictionary.ContainsKey(e.Id))
                     {
-                        // Single-finger drag
-                        if (touchDictionary.Count == 1)
-                        {
-                            SKPoint prevPoint = touchDictionary[e.Id];
+                        HandleUserDraw(point, false);
 
-                            // Track new bounding box!
-
-                            // Adjust the matrix for the new position
-                            matrix.TransX += point.X - prevPoint.X;
-                            matrix.TransY += point.Y - prevPoint.Y;
-                            canvasView.InvalidateSurface();
-                        }
                         // Double-finger rotate, scale, and drag
-                        else if (touchDictionary.Count >= 2)
+                        if (touchDictionary.Count >= 2)
                         {
                             // Copy two dictionary keys into array
                             long[] keys = new long[touchDictionary.Count];
