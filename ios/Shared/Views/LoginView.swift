@@ -44,7 +44,9 @@ struct LoginView: View {
                 Spacer()
                 Text("Admin Login")
                 TextField("Username", text: $username)
+                    .autocapitalization(.none)
                 TextField("Password", text: $password)
+                    .autocapitalization(.none)
                 Button("Login") {
                     Task {
                         do {
