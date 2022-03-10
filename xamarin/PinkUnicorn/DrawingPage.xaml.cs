@@ -6,13 +6,13 @@ using Xamarin.Forms;
 using PinkUnicorn.Models;
 using System.Linq;
 using PinkUnicorn.ViewModels;
+using System.Collections.Generic;
 
 namespace PinkUnicorn
 {
     public partial class DrawingPage : ContentPage
     {
-        float scale = 1.0f;
-        SKPoint offset = SKPoint.Empty;
+        SKMatrix matrix = SKMatrix.Identity;
 
         public DrawingPage(DrawingVievModel vievModel)
         {
@@ -24,6 +24,7 @@ namespace PinkUnicorn
 
         public DrawingVievModel ViewModel { get; }
 
+        SKPaint dotted = new SKPaint { Color = SKColors.Black, Style = SKPaintStyle.Stroke, PathEffect = SKPathEffect.CreateDash(new float[] { 10, 30 }, 20) };
         void OnCanvasViewPaintSurface(object sender, SKPaintSurfaceEventArgs args)
         {
             var info = args.Info;
@@ -31,9 +32,10 @@ namespace PinkUnicorn
             var canvas = surface.Canvas;
 
             canvas.Clear();
-            canvas.Scale(scale);
-            canvas.Translate(EffectiveOffset);
-            ViewModel.UpdateSubscription(canvas.LocalClipBounds);
+            canvas.SetMatrix(matrix);
+            var bounds = canvas.LocalClipBounds;
+            ViewModel.UpdateSubscription(bounds);
+            canvas.DrawLine(bounds.Left, 400, bounds.Right, 400, dotted);
 
             foreach (var c in ViewModel.Components)
             {
@@ -68,59 +70,107 @@ namespace PinkUnicorn
         }
 
         void RefreshCanvas()
-        {            
+        {
             canvasView.InvalidateSurface();
         }
 
-        void PinchGestureRecognizer_PinchUpdated(object sender, PinchGestureUpdatedEventArgs e)
-        {
-            //Console.WriteLine(e);
-            scale *= (float)e.Scale;
-            RefreshCanvas();
-        }
 
-        void TapGestureRecognizer_Tapped(object sender, EventArgs e)
-        {
-            //Console.WriteLine(e);
-            scale = 1.0f;
-            offset = SKPoint.Empty;
-            RefreshCanvas();
-        }
-
-        SKPoint panOffset = SKPoint.Empty;
-        void PanGestureRecognizer_PanUpdated(object sender, PanUpdatedEventArgs e)
-        {
-            //Console.WriteLine(e);
-            switch (e.StatusType)
-            {
-                case GestureStatus.Running:
-                    panOffset.X = (float)e.TotalX;
-                    panOffset.Y = (float)e.TotalY;
-                    break;
-                case GestureStatus.Completed:
-                    offset += panOffset;
-                    panOffset = SKPoint.Empty;
-                    break;
-                case GestureStatus.Canceled:
-                    panOffset = SKPoint.Empty;
-                    break;
-            }
-            RefreshCanvas();
-        }
-
-        SKPoint EffectiveOffset => offset + panOffset;
-
+        // Touch information
+        Dictionary<long, SKPoint> touchDictionary = new Dictionary<long, SKPoint>();
         void canvasView_Touch(object sender, SKTouchEventArgs e)
         {
-            //Console.WriteLine(e);
+            e.Handled = true;
+            Console.WriteLine(e);
+            var point = e.Location;
+
             switch (e.ActionType)
             {
                 case SKTouchAction.Pressed:
+                    if (!touchDictionary.ContainsKey(e.Id))
+                    {
+                        touchDictionary.Add(e.Id, point);
+                    }
+                    break;
+
                 case SKTouchAction.Moved:
+                    if (touchDictionary.ContainsKey(e.Id))
+                    {
+                        // Single-finger drag
+                        if (touchDictionary.Count == 1)
+                        {
+                            SKPoint prevPoint = touchDictionary[e.Id];
+
+                            // Track new bounding box!
+
+                            // Adjust the matrix for the new position
+                            matrix.TransX += point.X - prevPoint.X;
+                            matrix.TransY += point.Y - prevPoint.Y;
+                            canvasView.InvalidateSurface();
+                        }
+                        // Double-finger rotate, scale, and drag
+                        else if (touchDictionary.Count >= 2)
+                        {
+                            // Copy two dictionary keys into array
+                            long[] keys = new long[touchDictionary.Count];
+                            touchDictionary.Keys.CopyTo(keys, 0);
+
+                            // Find index non-moving (pivot) finger
+                            int pivotIndex = (keys[0] == e.Id) ? 1 : 0;
+
+                            // Get the three points in the transform
+                            var pivotPoint = touchDictionary[keys[pivotIndex]];
+                            var prevPoint = touchDictionary[e.Id];
+                            var newPoint = point;
+
+                            // Calculate two vectors
+                            var oldVector = prevPoint - pivotPoint;
+                            var newVector = newPoint - pivotPoint;
+
+                            // Find angles from pivot point to touch points
+                            var oldAngle = (float)Math.Atan2(oldVector.Y, oldVector.X);
+                            var newAngle = (float)Math.Atan2(newVector.Y, newVector.X);
+
+                            // Calculate rotation matrix
+                            var angle = newAngle - oldAngle;
+                            var rotationMatrix = SKMatrix.CreateRotation(angle, pivotPoint.X, pivotPoint.Y);
+
+                            // Effectively rotate the old vector
+                            var magnitudeRatio = Magnitude(oldVector) / Magnitude(newVector);
+                            oldVector.X = magnitudeRatio * newVector.X;
+                            oldVector.Y = magnitudeRatio * newVector.Y;
+
+                            // Isotropic scaling!
+                            var scale = Magnitude(newVector) / Magnitude(oldVector);
+
+                            if (!float.IsNaN(scale) && !float.IsInfinity(scale))
+                            {
+                                // Combine matrices
+                                var scaleMatrix = SKMatrix.CreateScale(scale, scale, pivotPoint.X, pivotPoint.Y);
+                                SKMatrix.PostConcat(ref rotationMatrix, scaleMatrix);
+                                SKMatrix.PostConcat(ref matrix, rotationMatrix);
+                                canvasView.InvalidateSurface();
+                            }
+                        }
+
+                        // Store the new point in the dictionary
+                        touchDictionary[e.Id] = point;
+                    }
+                    break;
+
+                case SKTouchAction.Cancelled:
+                case SKTouchAction.Exited:
                 case SKTouchAction.Released:
+                    if (touchDictionary.ContainsKey(e.Id))
+                    {
+                        touchDictionary.Remove(e.Id);
+                    }
                     break;
             }
-            e.Handled = true;
+        }
+
+        float Magnitude(SKPoint point)
+        {
+            return (float)Math.Sqrt(Math.Pow(point.X, 2) + Math.Pow(point.Y, 2));
         }
     }
 }

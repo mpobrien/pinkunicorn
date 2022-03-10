@@ -8,6 +8,7 @@ using Realms.Sync;
 using Xamarin.Forms;
 using Xamarin.Forms.Xaml;
 using Realms.Logging;
+using PinkUnicorn.Models;
 using PinkUnicorn.ViewModels;
 
 namespace PinkUnicorn
@@ -43,15 +44,15 @@ namespace PinkUnicorn
                 var config = new FlexibleSyncConfiguration(RealmApp.CurrentUser)
                 {
                     Schema = new[] {
-                        typeof(PinkUnicorn.Models.Component),
-                        typeof(PinkUnicorn.Models.Point)
+                        typeof(Component),
+                        typeof(Models.Point)
                     }
                 };
                 var realm = await Realm.GetInstanceAsync(config);
 
                 realm.Subscriptions.Update(() =>
                 {
-                    var viewPort = realm.All<PinkUnicorn.Models.Component>();
+                    var viewPort = realm.All<Component>();
                     realm.Subscriptions.Add(viewPort, new SubscriptionOptions { Name = "viewPort", UpdateExisting = true });
                 });
 
