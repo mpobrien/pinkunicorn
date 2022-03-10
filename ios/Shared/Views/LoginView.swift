@@ -2,8 +2,11 @@ import SwiftUI
 import RealmSwift
 
 struct LoginView: View {
-    @State var user: User?
+    @State var user: User? = app.currentUser
     @State var errorMessage: String?
+
+    @State var username: String = ""
+    @State var password: String = ""
 
     var body: some View {
         VStack {
@@ -11,6 +14,7 @@ struct LoginView: View {
                 AsyncView()
                     .environment(\.realmConfiguration, user.flexibleSyncConfiguration())
             } else {
+                Text("User Login")
                 Button("Login") {
                     Task {
                         do {
@@ -21,6 +25,21 @@ struct LoginView: View {
                         }
                     }
                 }
+                Spacer()
+                Text("Admin Login")
+                TextField("Username", text: $username)
+                TextField("Password", text: $password)
+                Button("Login") {
+                    Task {
+                        do {
+                            app.syncManager.logLevel = .all
+                            self.user = try await app.login(credentials: Credentials.emailPassword(email: username, password: password))
+                        } catch {
+                            self.errorMessage = error.localizedDescription
+                        }
+                    }
+                }
+                Spacer()
                 if let errorMessage = self.errorMessage {
                     Text("Error: \(errorMessage)")
                 }
