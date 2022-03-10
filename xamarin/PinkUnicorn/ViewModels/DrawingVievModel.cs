@@ -23,8 +23,12 @@ namespace PinkUnicorn.ViewModels
         public float StrokeWidth { get => strokeWidth; set => SetAndRaise(ref strokeWidth, value); }
 
         private SKColor? fillColor = null;
-        public SKColor? FillColor { get => fillColor; set => SetAndRaise(ref fillColor, value); }
+        public SKColor? FillColor { get => EnableFill ? fillColor : null; set => SetAndRaise(ref fillColor, value); }
 
+        private bool enableFill;
+        public bool EnableFill { get => enableFill; set => SetAndRaise(ref enableFill, value); }
+
+        public IEnumerable<Shape> SupportedShapes => new[] { Shape.Circle, Shape.Path, Shape.Rectangle };
         private Shape shape = Shape.Circle;
         public Shape Shape { get => shape; set => SetAndRaise(ref shape, value); }
 

@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+<xct:Popup
+    xmlns="http://xamarin.com/schemas/2014/forms"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:local="clr-namespace:PinkUnicorn"
+    xmlns:xct="clr-namespace:Xamarin.CommunityToolkit.UI.Views;assembly=Xamarin.CommunityToolkit"
+    xmlns:colorpicker="clr-namespace:ColorPicker;assembly=ColorPicker"
+    x:Class="PinkUnicorn.ColorPickerPopup">
+    <xct:Popup.Resources>
+        <local:SKColorToFormsColor x:Key="colorConverter" />
+    </xct:Popup.Resources>
+    <StackLayout Orientation="Horizontal">
+        <colorpicker:ColorCircle SelectedColor="{Binding StrokeColor, Mode=TwoWay, Converter={StaticResource colorConverter}}"/>
+        <colorpicker:ColorCircle SelectedColor="{Binding FillColor, Mode=TwoWay, Converter={StaticResource colorConverter}}"/>
+    </StackLayout>
+</xct:Popup>
