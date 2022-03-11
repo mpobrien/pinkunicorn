@@ -1,5 +1,4 @@
 ﻿using System;
-using Realms;
 using SkiaSharp;
 using SkiaSharp.Views.Forms;
 using Xamarin.Forms;
@@ -8,7 +7,6 @@ using System.Linq;
 using PinkUnicorn.ViewModels;
 using System.Collections.Generic;
 using Xamarin.CommunityToolkit.Extensions;
-using System.Threading.Tasks;
 
 namespace PinkUnicorn
 {
@@ -55,7 +53,7 @@ namespace PinkUnicorn
         void DrawComponent(SKCanvas canvas, Component c)
         {
             var strokeColor = c.StrokeColor;
-            if (strokeColor.Alpha == 0) strokeColor = strokeColor.WithAlpha(255);
+            if (strokeColor != SKColors.Transparent && strokeColor.Alpha == 0) strokeColor = strokeColor.WithAlpha(255);
             var strokePaint = new SKPaint { Color = strokeColor, StrokeWidth = (float)c.StrokeWidth, IsAntialias = true, IsStroke = true };
 
             var fillColor = c.FillColor ?? SKColors.Transparent;
@@ -291,7 +289,7 @@ namespace PinkUnicorn
 
         void Button_Clicked(object sender, EventArgs e)
         {
-            Application.Current.MainPage.Navigation.ShowPopup(new ColorPickerPopup(showColorPickers, ViewModel));
+            Application.Current.MainPage.Navigation.ShowPopup(new ColorAndShapePickerPopup(showColorPickers, ViewModel));
         }
     }
 }

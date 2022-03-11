@@ -1,0 +1,57 @@
+﻿<?xml version="1.0" encoding="UTF-8" ?>
+<xct:Popup
+    xmlns="http://xamarin.com/schemas/2014/forms"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:local="clr-namespace:PinkUnicorn"
+    xmlns:xct="clr-namespace:Xamarin.CommunityToolkit.UI.Views;assembly=Xamarin.CommunityToolkit"
+    xmlns:colorpicker="clr-namespace:ColorPicker;assembly=ColorPicker"
+    x:Class="PinkUnicorn.ColorAndShapePickerPopup"
+    Size="350,120"    
+    >
+    <xct:Popup.Resources>
+        <local:SKColorToFormsColor x:Key="colorConverter" />
+    </xct:Popup.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="120" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <colorpicker:ColorCircle SelectedColor="{Binding StrokeColor, Mode=TwoWay, Converter={StaticResource colorConverter}}"/>
+        <StackLayout
+            Grid.Column="1"
+            Margin="10"
+            >
+            <CarouselView
+                x:Name="carousel"
+                ItemsSource="{Binding SupportedShapes, Mode=OneWay}"
+                CurrentItem="{Binding Shape, Mode=TwoWay}"
+                HorizontalScrollBarVisibility="Never"
+                IndicatorView="indicactor"
+                >
+                <CarouselView.ItemTemplate>
+                    <DataTemplate>
+                        <local:DynamicShapeIcon
+                        Shape="{Binding .}"
+                        StrokeWidth="20"
+                        />
+                    </DataTemplate>
+                </CarouselView.ItemTemplate>
+            </CarouselView>
+            <IndicatorView
+                x:Name="indicactor"
+                IndicatorColor="LightGray"
+                SelectedIndicatorColor="DarkGray"
+                HorizontalOptions="Center"
+                >
+            </IndicatorView>
+        </StackLayout>
+        <colorpicker:ColorCircle
+            Grid.Column="2"
+            SelectedColor="{Binding FillColor, Mode=TwoWay, Converter={StaticResource colorConverter}}"
+            />
+    </Grid>
+</xct:Popup>

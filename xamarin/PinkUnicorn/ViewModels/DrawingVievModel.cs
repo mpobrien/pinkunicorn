@@ -26,7 +26,16 @@ namespace PinkUnicorn.ViewModels
         public SKColor? FillColor { get => EnableFill ? fillColor : null; set => SetAndRaise(ref fillColor, value); }
 
         private bool enableFill;
-        public bool EnableFill { get => enableFill; set => SetAndRaise(ref enableFill, value); }
+        public bool EnableFill
+        {
+            get => enableFill; set
+            {
+                if (SetAndRaise(ref enableFill, value))
+                {
+                    RaisePropertyChanged(() => FillColor);
+                }
+            }
+        }
 
         private Shape shape;
         public Shape Shape { get => shape; set => SetAndRaise(ref shape, value); }
