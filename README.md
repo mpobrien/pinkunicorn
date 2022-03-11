@@ -1,2 +1,2 @@
 # pinkunicorn
-![alt text](https://github.com/mpobrien/pinkunicorn/blob/master/logo.png)
+![alt text](https://github.com/mpobrien/pinkunicorn/blob/master/unicorn_logo.png)
