@@ -1,3 +1,0 @@
-[submodule "cpp_experiment/realm-core"]
-	path = cpp_experiment/realm-core
-	url = https://github.com/realm/realm-core.git
