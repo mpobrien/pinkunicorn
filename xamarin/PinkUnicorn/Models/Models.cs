@@ -9,7 +9,8 @@ namespace PinkUnicorn.Models
 {
     public enum Shape { Circle, Line, Path, Rectangle, Triangle }
 
-    public class Point : EmbeddedObject {
+    public class Point : EmbeddedObject
+    {
         [MapTo("x")]
         public double X { get; set; }
 
@@ -61,7 +62,19 @@ namespace PinkUnicorn.Models
         [MapTo("points")]
         private IList<Point> _Points { get; }
 
-        public IEnumerable<SKPoint> Points => _Points.Select((p) => new SKPoint((float)p.X, (float)p.Y));
+        public IEnumerable<SKPoint> Points
+        {
+            get => _Points.Select((p) => new SKPoint((float)p.X, (float)p.Y));
+            set
+            {
+                _Points.Clear();
+                foreach (var p in value)
+                {
+                    var converted = new Point { X = p.X, Y = p.Y };
+                    _Points.Add(converted);
+                }
+            }
+        }
 
         [MapTo("z")]
         public double Z { get; set; }
@@ -78,21 +91,29 @@ namespace PinkUnicorn.Models
                 if (Enum.TryParse(_Shape, true, out shape)) return shape;
                 return Shape.Rectangle;
             }
-            set => _Shape = value.ToString();
+            set => _Shape = value.ToString().ToLower();
         }
 
         [MapTo("strokeColor")]
-        public int _StrokeColor { get; set; }
+        private RealmValue _StrokeColor { get; set; }
 
-        public SKColor StrokeColor { get => new((uint)_StrokeColor); }
+        public SKColor StrokeColor
+        {
+            get => _StrokeColor.Type == RealmValueType.Int ? new((uint)_StrokeColor.AsInt32()) : SKColor.Parse(_StrokeColor.AsString());
+            set => _StrokeColor = (int)(uint)value;
+        }
 
         [MapTo("strokeWidth")]
         public double StrokeWidth { get; set; }
 
         [MapTo("fillColor")]
-        public int? _FillColor { get; set; }
+        private RealmValue _FillColor { get; set; } = RealmValue.Null;
 
-        public SKColor? FillColor { get => _FillColor == null ? null : new((uint)_FillColor); }
+        public SKColor? FillColor
+        {
+            get => _FillColor.Type == RealmValueType.Null ? null : _FillColor.Type == RealmValueType.Int ? new((uint)_FillColor.AsInt32()) : SKColor.Parse(_FillColor.AsString());
+            set => _FillColor = (int?)(uint?)value;
+        }
     }
 
     public class Owner : RealmObject
