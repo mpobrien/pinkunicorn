@@ -11,4 +11,4 @@ cmake --build .
 ./pink_unicorn
 ```
 
-#it just sync the remote sync with whatever schema it has
+### it just sync the remote sync with whatever schema it has
