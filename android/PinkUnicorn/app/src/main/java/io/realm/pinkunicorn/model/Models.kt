@@ -1,15 +1,15 @@
 package io.realm.pinkunicorn.model
 
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
+import io.realm.RealmAny
 import io.realm.RealmList
 import io.realm.RealmObject
 import io.realm.annotations.PrimaryKey
 import io.realm.annotations.RealmClass
 import io.realm.annotations.RealmField
 import io.realm.annotations.Required
-import io.realm.log.RealmLog
 import org.bson.types.ObjectId
+import java.lang.Math.floor
 
 enum class Shape {
     CIRCLE, PATH, RECTANGLE, UNKNOWN
@@ -35,7 +35,7 @@ open class Point(): RealmObject() {
         set(value) { _y = value.toDouble() }
 }
 
-open class Component: RealmObject() {
+open class Component: RealmObject {
 
     // MongoDB types
     @PrimaryKey
@@ -49,8 +49,8 @@ open class Component: RealmObject() {
     @Required
     @RealmField("shape") private var _shape: String = ""
     @RealmField("strokeWidth") private var _strokeWidth: Double = 0.0
-    @RealmField("strokeColor") private var _strokeColor: Int = 0
-    @RealmField("fillColor") private var _fillColor: Int? = 0
+    @RealmField("strokeColor") private var _strokeColor: RealmAny = RealmAny.nullValue()
+    @RealmField("fillColor") private var _fillColor: RealmAny = RealmAny.nullValue()
     var points: RealmList<Point> = RealmList()
 
     // Public types that hides conversion between MongoDB types and Compose types
@@ -85,15 +85,46 @@ open class Component: RealmObject() {
         set(value) { _strokeWidth = value.toDouble() }
 
     var strokeColor: Color
-        get() = convertRgbToArgb(_strokeColor)
-        set(value) { _strokeColor = value.toRgb() }
+        get() {
+            return when(_strokeColor.type) {
+                RealmAny.Type.INTEGER -> convertRgbToArgb(_strokeColor.asInteger())
+                RealmAny.Type.STRING -> {
+                    var color = _strokeColor.asString()
+                    if (!color.startsWith("#")) color = "#$color"
+                    Color(android.graphics.Color.parseColor(color))
+                }
+                else -> Color.Transparent
+            }
+        }
+        set(value) {
+            val color = RealmAny.valueOf(value.toRgb())
+            _strokeColor = color
+        }
 
     var fillColor: Color?
         get() {
-            val fc = _fillColor
-            return if (fc == null) null else convertRgbToArgb(fc)
+            val c = _fillColor
+            return when(c.type) {
+                RealmAny.Type.INTEGER -> convertRgbToArgb(c.asInteger())
+                RealmAny.Type.STRING -> {
+                    var color = c.asString()
+                    if (!color.startsWith("#")) color = "#$color"
+                    Color(android.graphics.Color.parseColor(color))
+                }
+                else -> null
+            }
         }
-        set(value) { _fillColor = value?.toArgb() }
+        set(value) {
+            _fillColor = if (value == null) {
+                RealmAny.nullValue()
+            } else {
+                val cValue = value.toRgb()
+                val color = RealmAny.valueOf(cValue)
+                color
+            }
+        }
+
+    constructor() : super()
 
     private fun convertRgbToArgb(rgbColor: Int): Color {
         val red: Int = rgbColor shr 16 and 0xFF
@@ -102,10 +133,15 @@ open class Component: RealmObject() {
         return Color(red, green, blue)
     }
 
+    private fun floatToInt(f: Float): Int {
+        val v: Float = if (f >= 1.0f) 255f else f * 256.0F
+        return kotlin.math.floor(v).toInt()
+    }
+
     private fun Color.toRgb(): Int {
-        var rgb = this.red.toInt()
-        rgb = ((rgb shl 8) + this.green).toInt()
-        rgb = ((rgb shl 8) + this.blue).toInt()
+        var rgb = floatToInt(this.red)
+        rgb = ((rgb shl 8) + floatToInt(this.green))
+        rgb = ((rgb shl 8) + floatToInt(this.blue))
         return rgb
     }
 
@@ -113,5 +149,8 @@ open class Component: RealmObject() {
         return "Component(points=$points, top=$top, left=$left, right=$right, bottom=$bottom, z=$z, shape=$shape, strokeWidth=$strokeWidth, strokeColor=$strokeColor, fillColor=$fillColor)"
     }
 
+    fun printBoundingBox(): String {
+        return "$shape[$left, $top, $right, $bottom]"
+    }
 
 }
