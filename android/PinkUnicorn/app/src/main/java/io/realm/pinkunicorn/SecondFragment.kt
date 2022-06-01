@@ -11,6 +11,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,6 +28,7 @@ import androidx.compose.material.LinearProgressIndicator
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -41,7 +43,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -52,6 +57,7 @@ import io.realm.pinkunicorn.databinding.FragmentSecondBinding
 import io.realm.pinkunicorn.model.Component
 import io.realm.pinkunicorn.model.Point
 import io.realm.pinkunicorn.model.Shape
+import kotlinx.coroutines.flow.collect
 
 val data = listOf(
     Component().apply {
@@ -164,18 +170,55 @@ class SecondFragment : Fragment() {
     }
 }
 
+val canvasWidth = 2000.dp
+val canvasHeight = 2000.dp
+
 @Composable
 fun DrawingBoard(vm: DrawingBoardViewModel) {
-    val verticalScrollState = rememberScrollState(initial = 2000)
-    val horizontalScrollState = rememberScrollState(initial = 2000)
-    horizontalScrollState.interactionSource
+    val densityDpi: Float = LocalDensity.current.density
+    vm.setCanvasSize(ViewPort(canvasWidth.value, canvasHeight.value))
+    val verticalScrollState = rememberScrollState(initial = (canvasWidth.value/2 * densityDpi).toInt())
+    val horizontalScrollState = rememberScrollState(initial = (canvasHeight.value/2 * densityDpi).toInt())
+
+    LaunchedEffect(verticalScrollState.interactionSource) {
+        verticalScrollState.interactionSource.interactions.collect {
+            when(it) {
+                is DragInteraction.Stop -> {
+                    RealmLog.error("Stop vertical scroll: ${verticalScrollState.value}")
+                    vm.updateVerticalScrollPosition((verticalScrollState.value/densityDpi))
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(horizontalScrollState.interactionSource) {
+        horizontalScrollState.interactionSource.interactions.collect {
+            when(it) {
+                is DragInteraction.Stop -> {
+                    RealmLog.error("Stop horizontal scroll: ${verticalScrollState.value}")
+                    vm.updateHorizontalScrollPosition((verticalScrollState.value/densityDpi))
+                }
+            }
+        }
+    }
 
     Box(modifier = Modifier
         .fillMaxSize()
-        .verticalScroll(state = verticalScrollState)
-        .horizontalScroll(state = horizontalScrollState)
-    ) {
-        BoardCanvas(vm)
+        .onSizeChanged {
+            vm.setViewportSize(
+                (it.width / densityDpi),
+                (it.height / densityDpi),
+                (verticalScrollState.value/densityDpi),
+                (horizontalScrollState.value/densityDpi),
+            )
+    }) {
+        Box(modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(state = verticalScrollState)
+            .horizontalScroll(state = horizontalScrollState)
+        ) {
+            BoardCanvas(vm)
+        }
     }
 }
 
@@ -183,24 +226,10 @@ fun DrawingBoard(vm: DrawingBoardViewModel) {
 @Composable
 fun BoardCanvas(vm: DrawingBoardViewModel) {
     val debug = true
-    val canvasWidth = 2000.dp
-    val canvasHeight = 2000.dp
-    val items by vm.observeDrawings().collectAsState(initial = listOf())
-    Canvas(
-        modifier = Modifier
-            .size(canvasHeight, canvasWidth)
-            .pointerInput(Unit) {
-                detectTapGestures { offset: Offset ->
-                    // Map back from Canvas coordinates to our "world" coordinates
-                    vm.canvasTapped(
-                        Offset(
-                            (offset.x.toDp() - canvasWidth/2).value,
-                            (offset.y.toDp() - canvasHeight/2).value
-                        )
-                    )
-                }
-            }
-    ) {
+    val loadedAreas by vm.observeLoadedAreas().collectAsState(initial = emptyList<Component>())
+
+    // Background canvas
+    Canvas(modifier = Modifier.size(canvasHeight, canvasWidth)) {
         // Debug lines
         if (debug) {
             drawLine(
@@ -215,16 +244,47 @@ fun BoardCanvas(vm: DrawingBoardViewModel) {
             )
         }
 
-        // Draw "forbidden" area
-        inset(left = 0f, top = 0f, right = 0f, bottom = 400.dp.toPx()) {
-            drawRect(color = Color.LightGray.copy(alpha = 0.5f), size = this.size)
-        }
+// Dont
+//        drawComponents(
+//            this,
+//            loadedAreas.map { it as BoundingBox }.map { it.toComponent()},
+//            canvasWidth,
+//            canvasHeight
+//        )
 
-        // Move (0,0) to center of drawing
+//        // Draw "forbidden" area
+//        inset(left = 0f, top = 0f, right = 0f, bottom = 400.dp.toPx()) {
+//            drawRect(color = Color.LightGray.copy(alpha = 0.5f), size = this.size)
+//        }
+    }
+
+    // Drawing canvas
+    val drawings by vm.observeDrawings().collectAsState(initial = listOf())
+    Canvas(
+        modifier = Modifier
+            .size(canvasHeight, canvasWidth)
+            .pointerInput(Unit) {
+                detectTapGestures { offset: Offset ->
+                    // Map back from Canvas coordinates to our "world" coordinates
+                    vm.canvasTapped(
+                        Offset(
+                            (offset.x.toDp() - canvasWidth / 2).value,
+                            (offset.y.toDp() - canvasHeight / 2).value
+                        )
+                    )
+                }
+            }
+    ) {
+        drawComponents(this, drawings, canvasWidth, canvasHeight)
+    }
+}
+
+fun drawComponents(scope: DrawScope, drawings: List<Component>, canvasWidth: Dp, canvasHeight: Dp) {
+    // Move (0,0) to center of drawing
+    scope.apply {
         translate(left = (canvasWidth / 2).toPx(), top = (canvasHeight / 2).toPx()) {
-            items.forEach { comp: Component ->
+            drawings.forEach { comp: Component ->
                 // Define bounding box for each component
-                )
                 try {
                     inset(
                         left = comp.left.dp.toPx(),

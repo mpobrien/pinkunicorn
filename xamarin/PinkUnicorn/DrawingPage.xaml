@@ -1,30 +1,56 @@
 ﻿<?xml version="1.0" encoding="UTF-8" ?>
 <ContentPage xmlns="http://xamarin.com/schemas/2014/forms"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:PinkUnicorn"
              xmlns:skia="clr-namespace:SkiaSharp.Views.Forms;assembly=SkiaSharp.Views.Forms"
-             xmlns:xct="http://xamarin.com/schemas/2020/toolkit"
-             xmlns:colorpicker="clr-namespace:ColorPicker;assembly=ColorPicker"
              xmlns:ios="clr-namespace:Xamarin.Forms.PlatformConfiguration.iOSSpecific;assembly=Xamarin.Forms.Core"
              xmlns:sharpnado="clr-namespace:Sharpnado.MaterialFrame;assembly=Sharpnado.MaterialFrame"
              x:Class="PinkUnicorn.DrawingPage"
              Title="Draw"
              ios:Page.UseSafeArea="true">
+    <ContentPage.Resources>
+        <local:SKColorToFormsColor x:Key="colorConverter" />
+    </ContentPage.Resources>
     <AbsoluteLayout>
-        <skia:SKCanvasView PaintSurface="OnCanvasViewPaintSurface"
-                           EnableTouchEvents="True" Touch="canvasView_Touch"
-                           x:Name="canvasView"
-                           AbsoluteLayout.LayoutBounds="0,0,1,1"
-                           AbsoluteLayout.LayoutFlags="All">
+        <skia:SKCanvasView
+            PaintSurface="OnCanvasViewPaintSurface"
+            EnableTouchEvents="True" Touch="canvasView_Touch"
+            x:Name="canvasView"
+            AbsoluteLayout.LayoutBounds="0,0,1,1"
+            AbsoluteLayout.LayoutFlags="All"
+            >
         </skia:SKCanvasView>
-        <sharpnado:MaterialFrame
-            AbsoluteLayout.LayoutBounds="0.1,0.9,1,0.1"
-            AbsoluteLayout.LayoutFlags="All">
-            <StackLayout Orientation="Horizontal">
-                <Label Text="TEST"/>
-                <Label Text="TEST"/>
-                <Label Text="TEST"/>
-                <Label Text="TEST"/>
-            </StackLayout>
-        </sharpnado:MaterialFrame>
+        <StackLayout
+            Margin="20"
+            AbsoluteLayout.LayoutBounds="0,1,-1,50"
+            AbsoluteLayout.LayoutFlags="PositionProportional"
+            Orientation="Horizontal"
+            >
+            <Slider
+                x:Name="strokeWidthSlider"
+                Maximum="100"
+                Value="{Binding StrokeWidth, Mode=TwoWay}"
+                MinimumTrackColor="{Binding StrokeColor, Mode=OneWay, Converter={StaticResource colorConverter}}"
+                VerticalOptions="Center"
+                />
+            <Label
+                Text="{Binding Source={x:Reference strokeWidthSlider}, Path=Value, StringFormat='{0:0}'}"
+                VerticalOptions="Center"
+                />
+            <Switch
+                IsToggled="{Binding EnableFill, Mode=TwoWay}"
+                OnColor="{Binding FillColor, Mode=OneWay, Converter={StaticResource colorConverter}}"
+                VerticalOptions="Center"
+                />
+            <local:DynamicShapeIcon
+                x:Name="showColorPickers"
+                EnableTouchEvents="True"
+                Shape="{Binding Shape, Mode=OneWay}"
+                StrokeColor="{Binding StrokeColor, Mode=OneWay}"
+                StrokeWidth="{Binding StrokeWidth, Mode=OneWay}"
+                FillColor="{Binding FillColor, Mode=OneWay}"
+                Touched="Button_Clicked"
+                />
+        </StackLayout>
     </AbsoluteLayout>
 </ContentPage>
